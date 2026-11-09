@@ -190,7 +190,7 @@ function calGrid(){
     const dn=all.filter(t=>t.done&&t.doneAt===d),pl=all.filter(t=>!t.done&&t.day===d).sort(byTime);
     const labs=labelsOf(d);const red=dowOf(d)===6||labs.some(l=>l.c==='hol');
     grid.append(h('button',{type:'button',class:(out?'out ':'')+(d===t0?'today ':'')+(d===st.sel&&!st.pick?'sel ':'')+(red?'red ':dowOf(d)===5?'blue ':''),
-      'aria-label':md(d)+(labs.length?' '+labs.map(l=>l.t).join(' '):'')+' 완료 '+dn.length+'개 예정 '+pl.length+'개',on:{click:()=>calTap(d)}},
+      'data-d':d,'aria-label':md(d)+(labs.length?' '+labs.map(l=>l.t).join(' '):'')+' 완료 '+dn.length+'개 예정 '+pl.length+'개',on:{click:()=>calTap(d)}},
       h('span',{class:'dl'},h('span',{class:'d',text:String(dt.getDate())}),labs.length?h('span',{class:'lab '+labs[0].c,text:labs[0].t}):null),
       pl.length?h('span',{class:'mini p',text:pl[0].text}):dn.length?h('span',{class:'mini',text:'✓'+dn[0].text}):null,
       h('span',{class:'mk'},dn.slice(pl.length?0:1,4).map(t=>h('i',{class:hasTag(t)?'c'+colOf(t.tag):''})),pl.slice(1,4).map(t=>h('i',{class:'p'+(hasTag(t)?' c'+colOf(t.tag):'')})))))});
@@ -201,33 +201,65 @@ function calTap(d){
   if(st.pick){const t=data().tasks.find(x=>x.id===st.pick);st.pick=null;
     if(t){if(t.rep){const r=data().reps.find(x=>x.id===t.rep);if(r)r.skip=(r.skip||[]).concat(t.day);t.rep=null}
       setDay(t,d);save();st.sel=d;render();toast('"'+t.text.slice(0,12)+'" '+md(d)+'로 정했어요');return}}
-  st.sel=d;if(dt.getMonth()!==st.m){st.y=dt.getFullYear();st.m=dt.getMonth();st.week=null}render();
+  if(popDay===d&&document.querySelector('.pop')){closePop();return}
+  st.sel=d;if(dt.getMonth()!==st.m){st.y=dt.getFullYear();st.m=dt.getMonth();st.week=null}render();showPop(d);
+}
+// 날짜를 누르면 그 날짜 위에 작은 말풍선: 그 날 할 일 몇 개
+let popDay=null;
+function closePop(){const p=document.querySelector('.pop');if(p)p.remove();popDay=null}
+function showPop(d){
+  closePop();
+  const top=document.querySelector('.mtop'),cell=document.querySelector('.cal button[data-d="'+d+'"]');
+  if(!top||!cell)return;
+  popDay=d;
+  const all=data().tasks;
+  const ts=all.filter(t=>t.day===d).sort((a,b)=>(a.done-b.done)||byTime(a,b));
+  const dn=all.filter(t=>t.done&&t.doneAt===d&&t.day!==d);
+  const list=[...ts,...dn];
+  const labs=labelsOf(d);
+  const again=()=>{render();showPop(d)};
+  const pop=h('div',{class:'pop',role:'dialog','aria-label':md(d)+' 할 일'},
+    h('div',{class:'pop-h'},h('b',{text:md(d)}),labs.map(l=>h('span',{class:'lab '+l.c,text:l.t}))),
+    list.length?list.slice(0,4).map(t=>h('div',{class:'pop-r'+(t.done?' done':'')},
+      h('button',{class:'ck'+(t.done?' on':''),type:'button','aria-label':t.done?'완료 취소':'완료',on:{click:e=>{e.stopPropagation();t.done=!t.done;t.doneAt=t.done?todayS():null;save();again()}}},t.done?'✓':''),
+      h('button',{type:'button',class:'pop-t',on:{click:e=>{e.stopPropagation();closePop();editSheet(t)}}},t.time?h('span',{class:'tm',text:t.time}):null,t.text))):h('p',{class:'pop-e',text:'할 일이 없어요'}),
+    list.length>4?h('p',{class:'pop-e',text:'+'+(list.length-4)+'개 더'}):null,
+    h('div',{class:'pop-a'},
+      h('button',{type:'button',text:'+ 할 일',on:{click:e=>{e.stopPropagation();closePop();quickAdd(d)}}}),
+      h('button',{type:'button',text:'+ 기념일',on:{click:e=>{e.stopPropagation();closePop();annivSheet(d)}}}),
+      h('button',{type:'button',text:'데일리 ›',on:{click:e=>{e.stopPropagation();closePop();st.day=d;st.tab='daily';window.scrollTo(0,0);render()}}})));
+  top.append(pop);
+  // 날짜 위에 놓고, 위에 자리가 없으면 아래에
+  const tr=top.getBoundingClientRect(),cr=cell.getBoundingClientRect();
+  const pw=pop.offsetWidth,ph=pop.offsetHeight;
+  let x=cr.left+cr.width/2-tr.left-pw/2;x=Math.max(4,Math.min(x,tr.width-pw-4));
+  let y=cr.top-tr.top-ph-8,below=false;
+  if(cr.top-ph-8<tr.top+40){y=cr.bottom-tr.top+8;below=true}
+  pop.style.left=x+'px';pop.style.top=y+'px';
+  pop.style.setProperty('--ax',(cr.left+cr.width/2-tr.left-x)+'px');
+  pop.classList.add(below?'below':'above');
+}
+document.addEventListener('click',e=>{if(popDay&&!e.target.closest('.pop,.cal'))closePop()},true);
+window.addEventListener('scroll',()=>{if(popDay&&!document.querySelector('.mtop'))closePop()},{passive:true});
+// 말풍선의 '+ 할 일': 그 날짜에 바로 적기
+function quickAdd(d){
+  const ci=h('input',{id:'qAdd',placeholder:'예: 3시 병원 (줄바꿈 없이 한 개)',maxlength:'200',on:{keydown:e=>{if(e.key==='Enter'&&!e.isComposing)go()}}});
+  function go(){const n=addTasks(ci.value,{month:mkOf(d),week:weekOfDay(d),day:d});if(n){close();render();showPop(d);toast(md(d)+'에 추가했어요')}}
+  const close=sheet(h('h3',{text:md(d)+'에 추가'}),ci,h('button',{class:'btn pri',type:'button',text:'추가',on:{click:go}}));
+  setTimeout(()=>ci.focus(),50);
 }
 
-// ── 먼슬리 (달력 + 고른 날 + 한 달 할 일)
+// ── 먼슬리 (위에 달력 고정 + 아래 한 달 할 일)
 function vMonthly(){
   const ws=weeksOf(st.y,st.m);
   const all=data().tasks;
-  if(mkOf(st.sel)!==mKey())st.sel=isThisMonth()?todayS():mKey()+'-01';
-  const s=st.sel;
   const ts=all.filter(t=>t.month===mKey()&&!t.rep);
   const reps=all.filter(t=>t.month===mKey()&&t.rep);
   const pickT=st.pick?all.find(x=>x.id===st.pick):null;
-  // 고른 날
-  const dayTs=all.filter(t=>t.day===s).sort(byTime),dayDone=all.filter(t=>t.done&&t.doneAt===s&&t.day!==s);
-  const cin=h('input',{id:'cAdd',placeholder:md(s)+'에 바로 추가 (예: 3시 병원)',maxlength:'200',on:{keydown:e=>{if(e.key==='Enter'&&!e.isComposing)cgo()}}});
-  function cgo(){const n=addTasks(cin.value,{month:mkOf(s),week:weekOfDay(s),day:s});if(n){render();toast(md(s)+'에 추가했어요')}}
-  const annivs=labelsOf(s).filter(l=>l.c==='ann');
-  const daybox=h('div',{class:'daybox'},
-    h('div',{class:'dh'},h('b',{text:md(s)+(s===todayS()?' · 오늘':'')}),labelSpans(s,'lab big')),
-    annivs.length?h('div',{class:'chips',style:'padding-left:0;margin:4px 0'},annivs.map(l=>h('button',{type:'button',class:'chip',text:'🎂 '+l.t+(l.a.yearly?' (매년)':'')+' ✕','aria-label':l.t+' 기념일 지우기',on:{click:()=>delAnniv(l.a)}}))):null,
-    dayTs.length||dayDone.length?h('div',{class:'list'},[...dayTs,...dayDone].map(t=>taskRow(t,null,{noDay:true}))):null,
-    h('div',{class:'add',style:'margin:8px 0 6px'},cin,h('button',{class:'go',type:'button',text:'추가',on:{click:cgo}})),
-    h('div',{class:'links'},h('button',{type:'button',text:'+ 기념일·생일',on:{click:()=>annivSheet(s)}}),h('button',{type:'button',text:'데일리 열기 ›',on:{click:()=>{st.day=s;st.tab='daily';window.scrollTo(0,0);render()}}})));
   // 한 달 할 일
   const ta=h('textarea',{id:'mAdd',rows:'4',placeholder:'이번 달 할 일을 한 줄에 하나씩 우다다 적어요\n예: 병원 예약\n    보고서 제출'});
   const box=[h('div',{class:'sec',text:'이번 달 할 일 적기'}),h('div',{class:'add'},ta,h('button',{class:'go',type:'button',text:'추가',on:{click:()=>{const n=addTasks(ta.value);if(n){ta.value='';render();toast(n+'개 추가했어요')}}}})),
-    tagPicker(),h('p',{class:'hint',text:'주차 버튼은 위클리로, 📅 날짜를 누르고 달력에서 날을 고르면 그 날로 정해져요.'})];
+    tagPicker(),h('p',{class:'hint',text:'주 버튼은 위클리로, 📅 날짜를 누르고 달력에서 날을 고르면 그 날로 정해져요. 달력 날짜를 누르면 그 날 할 일이 말풍선으로 보여요.'})];
   const undone=ts.filter(t=>!t.done),done=ts.filter(t=>t.done);
   const row=t=>taskRow(t,h('div',{class:'chips'},
     ws.map((w,i)=>h('button',{class:'chip'+(t.week===i&&!t.day?' on':''),type:'button',text:(i+1)+'주',on:{click:()=>{if(t.week===i&&!t.day){t.week=null}else{t.week=i;t.day=null}save();render()}}})),
@@ -235,10 +267,10 @@ function vMonthly(){
     t.day?timeChip(t):null));
   const unassigned=undone.filter(t=>t.week==null&&!t.day).length;
   const repDone=reps.filter(t=>t.done).length;
-  return [head('먼슬리',ts.length?ts.length+'개 중 '+done.length+'개 완료'+(unassigned?' · 안 정한 '+unassigned+'개':''):'달력 보며 할 일 정하기'),
+  // 2. 달력은 위에 고정, 아래 할 일만 스크롤
+  return [h('div',{class:'mtop'},head('먼슬리',ts.length?ts.length+'개 중 '+done.length+'개 완료'+(unassigned?' · 안 정한 '+unassigned+'개':''):'달력 보며 할 일 정하기'),
     pickT?h('div',{class:'pickbar'},h('span',null,'"',h('b',{text:pickT.text.slice(0,20)}),'" 언제 할까요? 달력에서 날짜를 눌러 주세요'),h('button',{type:'button',text:'취소',on:{click:()=>{st.pick=null;render()}}})):null,
-    calGrid(),
-    st.pick?null:daybox,
+    calGrid()),
     isThisMonth()?lateBox('month'):null,
     box,
     ts.length?null:emptyBox('아직 이번 달 할 일이 없어요.'),
@@ -313,8 +345,9 @@ function vDaily(){
 }
 
 function gearBtn(){const b=h('button',{type:'button','aria-label':'설정',on:{click:settingsSheet}});b.append(svg(GEAR));return b}
+const MON=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 function head(title,sub){
-  return h('div',{class:'head'},h('div',{class:'num',text:String(st.m+1)}),
+  return h('div',{class:'head'},h('div',{class:'num en','aria-label':(st.m+1)+'월',text:MON[st.m]}),
     h('div',{class:'t'},h('b',{text:title}),h('span',{text:st.y+'년 '+(st.m+1)+'월 · '+sub})),
     h('div',{class:'nav'},h('button',{type:'button','aria-label':'이전 달',text:'‹',on:{click:()=>mv(-1)}}),h('button',{type:'button','aria-label':'다음 달',text:'›',on:{click:()=>mv(1)}}),gearBtn()));
 }
@@ -339,6 +372,7 @@ function startDemo(){
 const ICONS={monthly:'M4 6h16v14H4z M4 10h16 M8 3v4 M16 3v4',weekly:'M4 6h16v12H4z M9 6v12 M14 6v12',daily:'M12 4a8 8 0 1 0 0 16a8 8 0 1 0 0-16 M12 8v4l3 2'};
 const TABS=[['monthly','먼슬리'],['weekly','위클리'],['daily','데일리']];
 function render(){
+  popDay=null;
   ensureRepeats(st.y,st.m);
   const app=document.getElementById('app');
   const sx=window.scrollY,foc=document.activeElement&&document.activeElement.id;
@@ -534,6 +568,7 @@ function stepBy(k){
 window.onBackKey=function(){
   if(window.AppInfo&&AppInfo.close())return true;
   if(closeLayer){closeLayer();return true}
+  if(popDay){closePop();return true}
   if(st.pick){st.pick=null;render();return true}
   if(st.tab!=='monthly'){st.tab='monthly';render();return true}
   return false};

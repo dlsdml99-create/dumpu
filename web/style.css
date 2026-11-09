@@ -175,3 +175,35 @@ button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px soli
 @media (prefers-reduced-motion:no-preference){
 #app.slide-l{animation:sl .22s ease-out}#app.slide-r{animation:sr .22s ease-out}
 @keyframes sl{from{transform:translateX(24px);opacity:.4}}@keyframes sr{from{transform:translateX(-24px);opacity:.4}}}
+
+/* v1.4: 먼슬리 달력 고정, 영어 월 */
+.num.en{font-size:40px;letter-spacing:-.02em;min-width:76px}
+.mtop{position:sticky;top:env(safe-area-inset-top,0px);z-index:3;background:var(--paper);padding-bottom:8px;margin-bottom:4px;border-bottom:1px solid var(--line)}
+.mtop .head{margin-bottom:8px}
+.mtop .cal div,.mtop .cal button{min-height:46px;padding:3px}
+.mtop .cal .dow{min-height:auto;padding:2px 0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--paper)}
+.mtop{isolation:isolate}
+.pop{position:absolute;z-index:5;width:min(230px,calc(100% - 8px));background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 8px 24px rgba(10,14,30,.22);padding:10px 12px}
+.pop::after{content:"";position:absolute;left:calc(var(--ax,50%) - 7px);width:12px;height:12px;background:var(--card);border:1px solid var(--line);transform:rotate(45deg)}
+.pop.above::after{bottom:-7px;border-top:0;border-left:0}
+.pop.below::after{top:-7px;border-bottom:0;border-right:0}
+.pop-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 6px;margin-bottom:4px}
+.pop-h b{font-size:14px}
+.pop-h .lab{font-size:11px}
+.pop-r{display:flex;align-items:center;gap:8px;padding:4px 0}
+.pop-r .ck{width:18px;height:18px;font-size:11px;border-radius:5px}
+.pop-t{flex:1;min-width:0;text-align:left;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pop-r.done .pop-t{color:var(--muted);text-decoration:line-through}
+.pop-e{margin:4px 0;color:var(--muted);font-size:12px}
+.pop-a{display:flex;justify-content:space-between;gap:6px;border-top:1px solid var(--line);margin-top:6px;padding-top:6px}
+.pop-a button{font-size:12px;font-weight:700;color:var(--cobalt)}
+@media (prefers-reduced-motion:no-preference){.pop{animation:pin .14s ease-out}@keyframes pin{from{opacity:0;transform:scale(.96)}}}
+.mtop .head .num.en{font-size:34px;min-width:66px}
+@media (max-height:760px){
+.mtop .head{margin:0 0 4px}
+.mtop .head .t span{font-size:12px}
+.mtop .cal div,.mtop .cal button{min-height:36px;padding:2px 3px;gap:1px}
+.mtop .cal .mini{display:none}
+}
+.mtop .head .t span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
