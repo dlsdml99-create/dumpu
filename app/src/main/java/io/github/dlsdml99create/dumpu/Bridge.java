@@ -5,7 +5,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.webkit.JavascriptInterface;
 
-/** 앱 화면(자바스크립트)과 폰 기능을 잇는 다리. 화면에서 부를 수 있는 건 아래 5개뿐. */
+/** 앱 화면(자바스크립트)과 폰 기능을 잇는 다리. 화면에서 부를 수 있는 건 아래 6개뿐. */
 public class Bridge {
     private final MainActivity act;
 
@@ -32,6 +32,21 @@ public class Bridge {
 
     @JavascriptInterface
     public void openUrl(String url) { act.runOnUiThread(() -> openSafe(act, url)); }
+
+    /** 백업 글을 카톡·메모 등으로 보내기 (사용자가 받는 앱을 직접 고름). */
+    @JavascriptInterface
+    public void share(String text) {
+        if (text == null || text.isEmpty() || text.length() > 200_000) return;
+        act.runOnUiThread(() -> {
+            try {
+                Intent i = new Intent(Intent.ACTION_SEND);
+                i.setType("text/plain");
+                i.putExtra(Intent.EXTRA_SUBJECT, "덤푸 백업");
+                i.putExtra(Intent.EXTRA_TEXT, text);
+                act.startActivity(Intent.createChooser(i, "덤푸 백업 보내기"));
+            } catch (Exception ignored) { }
+        });
+    }
 
     /** 이 앱의 GitHub 페이지·다운로드 주소만 밖(브라우저)에서 연다. */
     static void openSafe(Context c, String url) {
