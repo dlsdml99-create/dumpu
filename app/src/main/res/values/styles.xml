@@ -5,7 +5,7 @@
     <color name="cobalt">#1F3FA6</color>
     <color name="muted">#6B7290</color>
     <color name="soft">#EEF1FB</color>
-    <color name="icon_bg">#DDE6FF</color>
+    <color name="icon_bg">#DFF5EA</color>
     <style name="AppTheme" parent="@android:style/Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/paper</item>
         <item name="android:statusBarColor">@color/paper</item>
