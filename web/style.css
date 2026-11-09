@@ -242,7 +242,7 @@ textarea.code{width:100%;font:12px/1.4 ui-monospace,monospace;border:1px solid v
 .tt-p .row{border-bottom:0;padding-top:6px;padding-bottom:6px}
 .tt-p .tl-add{min-height:36px}
 .tt-h{font-size:13px;font-weight:800;text-align:center;padding-top:9px;font-variant-numeric:tabular-nums;color:var(--ink)}
-.tt-g{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;padding:5px 0 5px 4px;touch-action:none;-webkit-user-select:none;user-select:none}
+.tt-g{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;padding:5px 0 5px 4px;touch-action:pan-y;-webkit-user-select:none;user-select:none}
 .tt-head .tt-g{padding:4px 0 4px 4px}
 .cell-l{font-size:9px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}
 .cell{border:1px solid var(--line);border-radius:4px;min-height:24px;background:var(--card)}
@@ -306,3 +306,12 @@ img.shot{width:100%;border:1px solid var(--line);border-radius:10px;margin:8px 0
 .rp{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 textarea.diary{width:100%;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;resize:vertical}
 .pop-d{margin:4px 0;font-size:12px;font-style:italic;color:var(--ink)}
+
+/* v2.0: 반복 고르기, 먼슬리 적기 창, 길게 눌러 칠하기 */
+.addbig{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;border:1.5px dashed var(--cobalt);border-radius:14px;padding:12px 14px;margin:10px 0 6px;color:var(--cobalt);text-align:left}
+.addbig b{font-size:16px}
+.addbig span{font-size:12px;color:var(--muted)}
+.chips.rules{padding-left:0;margin:6px 0}
+.rule-now{color:var(--cobalt)!important;font-weight:700}
+body.typing .mtop{position:static}
+.cell.hold{outline:2px solid var(--cobalt)}
