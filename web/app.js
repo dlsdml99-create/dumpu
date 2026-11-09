@@ -13,7 +13,7 @@ const mkOf=s=>s.slice(0,7);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const isDate=s=>{if(typeof s!=='string'||!/^\d{4}-\d\d-\d\d$/.test(s))return false;const d=parse(s);return ymd(d)===s&&d.getFullYear()>=2000&&d.getFullYear()<=2100};
 const isTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
-const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[0,1,2],hol:true,early:false,late:false}});
+const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
 
 // ── 공휴일 (한국천문연구원 월력요항·정부 발표 기준, 2026~2028)
 const HOL={
@@ -58,17 +58,19 @@ function labelsOf(s){
 
 // 저장 (이 기기에만)
 let real=blank();
-try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v&&Array.isArray(v.tasks)){real=Object.assign(blank(),v);real.settings=Object.assign(blank().settings,v.settings||{})}}catch(e){}
+try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v&&Array.isArray(v.tasks)){real=Object.assign(blank(),v);real.settings=Object.assign(blank().settings,{tagColor:undefined,palV:1},v.settings||{})}}catch(e){}
 // 예전 버전 데이터 고치기: 매주 반복이 요일 하나였던 것 → 여러 요일
 for(const r of real.reps){if(r.type==='week'&&!Array.isArray(r.dows))r.dows=[r.dow|0]}
 if(!Array.isArray(real.annivs))real.annivs=[];
 if(!real.logs||typeof real.logs!=='object'||Array.isArray(real.logs))real.logs={};
 if(!real.ents||typeof real.ents!=='object'||Array.isArray(real.ents))real.ents={};
 {const S=real.settings;if(!Array.isArray(S.tags)||!S.tags.length)S.tags=['회사','집','약속'];S.tags=S.tags.slice(0,8);
- if(!Array.isArray(S.tagColor))S.tagColor=[];S.tags.forEach((_,i)=>{if(!(S.tagColor[i]>=0&&S.tagColor[i]<8))S.tagColor[i]=i%8});S.tagColor.length=S.tags.length}
+ if(!Array.isArray(S.tagColor))S.tagColor=[];S.tags.forEach((_,i)=>{if(!(S.tagColor[i]>=0&&S.tagColor[i]<8))S.tagColor[i]=i%8});S.tagColor.length=S.tags.length
+ if(S.palV!==2){const MAP=[4,3,1,6,5,2,3,7];S.tagColor=S.tagColor.map(o=>MAP[o]);S.palV=2} // 예전 색(파랑·청록·주황·분홍·보라·노랑·초록·회색) → 가장 비슷한 새 색
+}
 let demo=null;
 const data=()=>demo||real;
-function save(){if(demo)return;try{localStorage.setItem(KEY,JSON.stringify(real))}catch(e){}syncNative()}
+function save(){quickCache=null;if(demo)return;try{localStorage.setItem(KEY,JSON.stringify(real))}catch(e){}syncNative()}
 const byOrd=(a,b)=>(a.ord??1e9)-(b.ord??1e9);
 const byTime=(a,b)=>(a.time||'99')<(b.time||'99')?-1:(a.time||'99')>(b.time||'99')?1:0;
 // 위젯·알림이 쓸 오늘부터 2주치 할 일만 앱(네이티브)에 넘긴다
@@ -78,7 +80,10 @@ function syncNative(){
     const days={};const base=parse(todayS());
     for(let i=0;i<14;i++){const x=new Date(base);x.setDate(base.getDate()+i);const s=ymd(x);
       days[s]=real.tasks.filter(t=>t.day===s).sort(byTime).slice(0,30).map(t=>({id:t.id,text:((t.time?t.time+' ':'')+t.text).slice(0,60),done:!!t.done}))}
-    B.sync(JSON.stringify({days,alarm:!!real.settings.alarm,time:real.settings.time}));
+    const t0=todayS(),L=real.logs[t0]||{},filled=[];
+    for(let hh=0;hh<24;hh++){let n=0;for(let k=0;k<6;k++)if(L[hh*6+k])n++;if(n>=3)filled.push(hh)} // 반 이상 적은 시간은 안 물어봄
+    const S=real.settings;
+    B.sync(JSON.stringify({days,alarm:!!S.alarm,time:S.time,hourly:!!S.hourly,hFrom:S.hFrom|0,hTo:S.hTo|0,filledDay:t0,filled}));
   }catch(e){}
 }
 // 위젯에서 체크한 것을 앱 데이터에 반영
@@ -178,7 +183,7 @@ const tagName=i=>data().settings.tags[i];
 const tagIdx=()=>data().settings.tags.map((_,i)=>i);
 const colOf=i=>{const c=data().settings.tagColor;return c&&c[i]!=null?c[i]:i%8};
 const hasTag=t=>t.tag!=null&&t.tag<data().settings.tags.length;
-const COLORS=['파랑','청록','주황','분홍','보라','노랑','초록','회색'];
+const COLORS=['빨강','주황','노랑','초록','파랑','보라','분홍','회색'];
 
 function taskRow(t,extra,opt){
   const tags=[];
@@ -229,6 +234,82 @@ function statsFor(days){
   const did=planned.filter(t=>t.done||Object.values((D.logs||{})[t.day]||{}).includes(t.id));
   return {total,items:Object.values(items).sort((a,b)=>b.min-a.min),cats,planned:planned.length,did:did.length};
 }
+// 데일리를 그림(PNG)으로: 다이어리 인증용. 인터넷 안 씀, 폰 안에서 그림
+function cssVar(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||'#888'}
+function dayImage(d){
+  const D=data(),S=D.settings,L=D.logs[d]||{};
+  const ts=D.tasks.filter(t=>t.day===d),timed=ts.filter(t=>t.time).sort(byTime),untimed=ts.filter(t=>!t.time);
+  let h0=S.early?0:7,h1=S.late?23:22;
+  for(const t of timed){const x=+t.time.slice(0,2);if(x<h0)h0=x;if(x>h1)h1=x}
+  for(const k in L){const x=Math.floor(+k/6);if(x<h0)h0=x;if(x>h1)h1=x}
+  const W=1080,RH=56,top=220+(untimed.length?60+Math.ceil(untimed.length/2)*44:0),H=top+(h1-h0+1)*RH+190;
+  const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
+  const C={bg:cssVar('--paper'),card:cssVar('--card'),ink:cssVar('--ink'),mu:cssVar('--muted'),line:cssVar('--line'),acc:cssVar('--cobalt')};
+  const col=it=>it&&okTag(it.tag)?cssVar('--t'+colOf(it.tag)):C.mu;
+  const F='system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif';
+  g.fillStyle=C.bg;g.fillRect(0,0,W,H);
+  const dt=parse(d);
+  g.fillStyle=C.acc;g.font='800 120px '+F;g.fillText(String(dt.getDate()),60,150);
+  g.fillStyle=C.ink;g.font='800 44px '+F;g.fillText(dt.getFullYear()+'. '+(dt.getMonth()+1)+'. '+DOW[dowOf(d)]+'요일',260,105);
+  g.fillStyle=C.mu;g.font='500 30px '+F;g.fillText(labelsOf(d).map(l=>l.t).join(' · ')||'덤푸 10분 플래너',260,150);
+  let y=200;
+  if(untimed.length){g.fillStyle=C.mu;g.font='700 28px '+F;g.fillText('시간 안 정한 할 일',60,y+30);y+=60;
+    untimed.forEach((t,i)=>{const x=60+(i%2)*490,yy=y+Math.floor(i/2)*44;g.fillStyle=hasTag(t)?cssVar('--t'+colOf(t.tag)):C.mu;g.fillRect(x,yy-24,6,30);
+      g.fillStyle=t.done?C.mu:C.ink;g.font='600 28px '+F;const tx=t.text.slice(0,16);g.fillText(tx,x+18,yy);
+      if(t.done){const tw=g.measureText(tx).width;g.fillRect(x+18,yy-10,tw,3)}});}
+  y=top;
+  const PX=60,PW=540,HX=PX+PW,HW=60,GX=HX+HW+10,CW=(W-60-GX)/6;
+  g.strokeStyle=C.line;g.lineWidth=2;
+  for(let hh=h0;hh<=h1;hh++){const ry=y+(hh-h0)*RH;
+    g.beginPath();g.moveTo(PX,ry);g.lineTo(W-60,ry);g.stroke();
+    g.fillStyle=C.ink;g.font='800 28px '+F;g.textAlign='center';g.fillText(String(hh),HX+HW/2,ry+38);g.textAlign='left';
+    const plans=timed.filter(t=>+t.time.slice(0,2)===hh).map(t=>({tx:t.time+' '+t.text,c:hasTag(t)?cssVar('--t'+colOf(t.tag)):C.ink,done:t.done}));
+    for(let k=0;k<6;k++){const sl=hh*6+k,v=L[sl];if(v&&v.startsWith('e:')&&L[sl-1]!==v){const it=logItem(v);if(it)plans.push({tx:'✎ '+slotT(sl)+' '+it.text,c:col(it)})}}
+    plans.slice(0,1).forEach(p=>{g.fillStyle=p.done?C.mu:p.c;g.font='600 26px '+F;const tx=p.tx.slice(0,20)+(plans.length>1?' 외 '+(plans.length-1):'');g.fillText(tx,PX+8,ry+37);if(p.done){g.fillRect(PX+8,ry+28,g.measureText(tx).width,3)}});
+    for(let k=0;k<6;k++){const it=logItem(L[hh*6+k]);const x=GX+k*CW+3,yy=ry+8;
+      g.fillStyle=it?col(it):C.card;g.fillRect(x,yy,CW-6,RH-16);g.strokeStyle=C.line;g.strokeRect(x,yy,CW-6,RH-16)}}
+  g.beginPath();g.moveTo(PX,y+(h1-h0+1)*RH);g.lineTo(W-60,y+(h1-h0+1)*RH);g.stroke();
+  g.beginPath();g.moveTo(HX,y);g.lineTo(HX,y+(h1-h0+1)*RH);g.stroke();
+  const St=statsFor([d]);let sy=y+(h1-h0+1)*RH+60;
+  g.fillStyle=C.ink;g.font='800 32px '+F;g.fillText('실제로 한 시간 '+hm(St.total)+(St.planned?'  ·  계획 '+St.did+'/'+St.planned+' ('+Math.round(St.did/St.planned*100)+'%)':''),60,sy);
+  g.font='500 26px '+F;g.fillStyle=C.mu;g.fillText(St.items.slice(0,4).map(x=>x.text.slice(0,8)+' '+hm(x.min)).join('  ·  '),60,sy+46);
+  g.textAlign='right';g.fillText('덤푸',W-60,H-30);g.textAlign='left';
+  const url=c.toDataURL('image/png');
+  const close=sheet(h('h3',{text:md(d)+' 이미지'}),h('img',{src:url,alt:md(d)+' 10분 플래너 그림',class:'shot'}),
+    B&&B.saveImage?[
+      h('button',{class:'btn pri',type:'button',text:'사진첩에 저장',on:{click:()=>{const r=B.saveImage(url.split(',')[1],false);toast(r==='ok'?'사진첩(Pictures/덤푸)에 저장했어요':r==='old'?'이 폰(안드로이드 9 이하)에서는 저장이 안 돼요':'저장하지 못했어요')}}}),
+      h('button',{class:'btn',type:'button',text:'공유하기 (카톡·인스타 등)',on:{click:()=>{const r=B.saveImage(url.split(',')[1],true);if(r!=='ok')toast(r==='old'?'이 폰에서는 공유가 안 돼요':'공유하지 못했어요')}}})]:
+    [h('button',{class:'btn pri',type:'button',text:'이미지 저장·공유',on:{click:()=>{c.toBlob(bl=>{if(!bl)return;const f=new File([bl],'dumpu-'+d+'.png',{type:'image/png'});
+        if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'덤푸 '+md(d)}).catch(()=>{});
+        else{const a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}})}}}),
+     h('p',{text:'아이폰은 사진을 길게 눌러 "사진에 저장"해도 돼요.'})]);
+}
+// 한 주 10분 기록 모아 보기 (잠·일·운동 패턴)
+function weekGrid(w){
+  const D=data(),S=D.settings;
+  if(!w.some(d=>D.logs[d]&&Object.keys(D.logs[d]).length))return null;
+  let h0=S.early?0:7,h1=S.late?23:22;
+  for(const d of w){const L=D.logs[d]||{};for(const k in L){const hh=Math.floor(+k/6);if(hh<h0)h0=hh;if(hh>h1)h1=hh}}
+  const t0=todayS();
+  const g=h('div',{class:'wg'},h('div',{class:'wg-r wg-head'},h('span'),w.map((d,i)=>h('button',{type:'button',class:'wg-d'+(d===t0?' tdy':''),text:DOW[i]+' '+parse(d).getDate(),on:{click:()=>{st.day=d;st.tab='daily';window.scrollTo(0,0);render()}}}))));
+  for(let hh=h0;hh<=h1;hh++){
+    g.append(h('div',{class:'wg-r'},h('span',{class:'wg-h',text:String(hh)}),
+      w.map(d=>{const L=D.logs[d]||{};return h('span',{class:'wg-c'},[0,1,2,3,4,5].map(k=>{const it=logItem(L[hh*6+k]);return h('i',{class:it?itemCls(it):''})}))})));
+  }
+  return [h('div',{class:'sec',text:'이번 주 10분 기록 · 요일을 누르면 그 날로'}),g];
+}
+// 자주 쓴 직접 기록 (최근 60일, 많이 쓴 순 5개) → 한 번 누르고 쓸기만
+let quickCache=null;
+function quickList(){
+  if(quickCache)return quickCache;
+  const D=data(),cnt={},meta={};const from=ymd(new Date(Date.now()-60*864e5));
+  for(const d in D.logs){if(d<from)continue;const L=D.logs[d];
+    for(const k in L){const v=L[k];if(!v.startsWith('e:'))continue;const e=ents()[v.slice(2)];if(!e)continue;
+      if(okTag(e.tag)&&e.text===tagName(e.tag))continue; // 카테고리로 칠한 건 빼기
+      const key=e.tag+'|'+e.text;cnt[key]=(cnt[key]||0)+1;meta[key]={text:e.text,tag:e.tag}}}
+  quickCache=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]).slice(0,5).map(k=>meta[k]);
+  return quickCache;
+}
 function actualBox(days,label){
   const S=statsFor(days);
   if(!S.total&&!S.planned)return null;
@@ -246,13 +327,19 @@ function calGrid(){
   const ws=weeksOf(st.y,st.m);const t0=todayS();const all=data().tasks;
   const grid=h('div',{class:'cal'+(st.pick?' picking':'')},DOW.map((x,i)=>h('div',{class:'dow'+(i===6?' sun':i===5?' sat':''),text:x})));
   ws.flat().forEach(d=>{const dt=parse(d);const out=dt.getMonth()!==st.m;
-    const dn=all.filter(t=>t.done&&t.doneAt===d),pl=all.filter(t=>!t.done&&t.day===d).sort(byTime);
+    const onDay=all.filter(t=>t.day===d);
+    const routine=onDay.filter(t=>t.rep).sort(byTime);
+    const plain=onDay.filter(t=>!t.rep).sort(byTime);
+    const doneOther=all.filter(t=>t.done&&t.doneAt===d&&t.day!==d&&!t.rep);
+    const todo=plain.filter(t=>!t.done);
     const labs=labelsOf(d);const red=dowOf(d)===6||labs.some(l=>l.c==='hol');
+    const dots=[...plain,...doneOther];
     grid.append(h('button',{type:'button',class:(out?'out ':'')+(d===t0?'today ':'')+(d===st.sel&&!st.pick?'sel ':'')+(red?'red ':dowOf(d)===5?'blue ':''),
-      'data-d':d,'data-drop':'day:'+d,'aria-label':md(d)+(labs.length?' '+labs.map(l=>l.t).join(' '):'')+' 완료 '+dn.length+'개 예정 '+pl.length+'개',on:{click:()=>calTap(d)}},
+      'data-d':d,'data-drop':'day:'+d,'aria-label':md(d)+(labs.length?' '+labs.map(l=>l.t).join(' '):'')+' 할 일 '+todo.length+'개, 루틴 '+routine.filter(t=>t.done).length+'/'+routine.length+', 완료 '+dots.filter(t=>t.done).length+'개',on:{click:()=>calTap(d)}},
       h('span',{class:'dl'},h('span',{class:'d',text:String(dt.getDate())}),labs.length?h('span',{class:'lab '+labs[0].c,text:labs[0].t}):null),
-      pl.length?h('span',{class:'mini p'+(hasTag(pl[0])?' tc'+colOf(pl[0].tag):''),text:pl[0].text}):dn.length?h('span',{class:'mini',text:'✓'+dn[0].text}):null,
-      h('span',{class:'mk'},dn.slice(pl.length?0:1,4).map(t=>h('i',{class:hasTag(t)?'c'+colOf(t.tag):''})),pl.slice(1,4).map(t=>h('i',{class:'p'+(hasTag(t)?' c'+colOf(t.tag):'')})))))});
+      todo.length?h('span',{class:'mini p'+(hasTag(todo[0])?' tc'+colOf(todo[0].tag):''),text:todo[0].text}):null,
+      routine.length?h('span',{class:'rt-row'},routine.slice(0,5).map(t=>h('i',{class:'rt'+(t.done?' on':'')+' tc'+(hasTag(t)?colOf(t.tag):'n'),text:t.done?'♥':'♡'}))):null,
+      dots.length?h('span',{class:'mk'},dots.slice(0,6).map(t=>h('i',{class:(t.done?'':'p ')+(hasTag(t)?'c'+colOf(t.tag):'cn')}))):null))});
   return grid;
 }
 function calTap(d){
@@ -357,7 +444,7 @@ function vWeekly(){
   const isNow=w.includes(t0);
   return [head('위클리',(st.week+1)+'주차 · '+(parse(w[0]).getMonth()+1)+'/'+parse(w[0]).getDate()+'~'+(parse(w[6]).getMonth()+1)+'/'+parse(w[6]).getDate()),
     h('div',{class:'weeks'},ws.map((_,i)=>h('button',{class:'chip'+(i===st.week?' on':''),type:'button',text:(i+1)+'주차',on:{click:()=>{st.week=i;render()}}}))),
-    isNow?lateBox('week'):null,strip,actualBox(w,'이번 주'),
+    isNow?lateBox('week'):null,strip,actualBox(w,'이번 주'),weekGrid(w),
     h('div',{class:'add'},inp,h('button',{class:'go',type:'button',text:'추가',on:{click:go}})),tagPicker(),
     ts.length?null:emptyBox('이 주에 정리된 할 일이 없어요. 먼슬리에서 주 버튼을 누르거나 위에 바로 적어요.'),
     undone.length?[h('div',{class:'sec',text:'할 일 '+undone.length+' · 요일 버튼이나 위 날짜 칸으로 끌어서 데일리로'}),h('div',{class:'list'},undone.map(row))]:null,
@@ -383,8 +470,9 @@ function vDaily(){
   const h0=Math.min(S.early?0:7,...hrs),h1=Math.max(S.late?23:22,...hrs);
   const nowH=d===todayS()?new Date().getHours():-1,nowM=new Date().getMinutes();
   const log=(data().logs||{})[d]||{};
-  if(st.brush&&!st.brush.startsWith('cat:')&&!ts.some(t=>t.id===st.brush))st.brush=null;
+  if(st.brush&&!st.brush.startsWith('cat:')&&!st.brush.startsWith('q:')&&!ts.some(t=>t.id===st.brush))st.brush=null;
   if(st.brush&&st.brush.startsWith('cat:')&&!okTag(+st.brush.slice(4)))st.brush=null;
+  if(st.brush&&st.brush.startsWith('q:')&&!quickList()[+st.brush.slice(2)])st.brush=null;
   const tt=h('div',{class:'tt','data-day':d},
     h('div',{class:'tt-r tt-head'},h('span',{class:'tt-p',text:'계획 · 기록'}),h('span',{class:'tt-h'}),h('div',{class:'tt-g'},[10,20,30,40,50,60].map(m=>h('span',{class:'cell-l',text:m})))),
     !S.early&&h0>0?h('button',{type:'button',class:'tt-more',text:'▲ 새벽 시간 보기 (0~6시)',on:{click:()=>{S.early=true;save();render()}}}):null);
@@ -408,9 +496,10 @@ function vDaily(){
   const brush=h('div',{class:'brush'},h('span',{class:'lb',text:'칠하기'}),
     h('button',{type:'button',class:'chip'+(st.brush==null?' on':''),on:{click:()=>{st.brush=null;render()}}},'✏️ 직접 쓰기'),
     ts.map(t=>bchip(t.id,t.text.slice(0,10),hasTag(t)?'c'+colOf(t.tag):'cn')),
+    quickList().map((q,i)=>bchip('q:'+i,'★ '+q.text.slice(0,8),okTag(q.tag)?'c'+colOf(q.tag):'cn')),
     h('span',{class:'lb',style:'margin-left:4px',text:'·'}),
     tagIdx().map(i=>bchip('cat:'+i,tagName(i),'c'+colOf(i)+' sq')));
-  const bName=st.brush==null?null:st.brush.startsWith('cat:')?tagName(+st.brush.slice(4)):(data().tasks.find(t=>t.id===st.brush)||{text:''}).text.slice(0,10);
+  const bName=st.brush==null?null:st.brush.startsWith('q:')?(quickList()[+st.brush.slice(2)]||{text:''}).text:st.brush.startsWith('cat:')?tagName(+st.brush.slice(4)):(data().tasks.find(t=>t.id===st.brush)||{text:''}).text.slice(0,10);
   const sum=actualBox([d],'오늘');
   const labs=labelsOf(d);
   return [h('div',{class:'head'},h('div',{class:'num',text:String(dt.getDate())}),
@@ -421,7 +510,7 @@ function vDaily(){
     h('p',{class:'hint',text:'앞에 시간을 쓰면(3시 병원) 타임라인에 들어가요.'},d!==todayS()?[' ',h('button',{type:'button',style:'color:var(--cobalt);font-weight:700',text:'오늘로 가기',on:{click:()=>{st.day=todayS();render()}}})]:null),
     !ts.length?emptyBox('이 날 할 일이 없어요. 위클리에서 요일을 누르거나 위에 바로 적어요.'):null,
     untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 아래 계획 칸으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true})))]:null,
-    h('div',{class:'sec',text:'10분 플래너'}),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:bName?'오른쪽 칸을 쓸면 "'+bName+'"(으)로 칠해져요. 같은 걸 칠한 칸을 다시 쓸면 지워져요.':'빈 10분 칸을 쭉 쓸고 무엇을 했는지 적어요 (예: 7:30~8:00 아침밥). 칠한 칸을 누르면 고치거나 지워요.'}),tt,sum,
+    h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 이미지로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:bName?'오른쪽 칸을 쓸면 "'+bName+'"(으)로 칠해져요. 같은 걸 칠한 칸을 다시 쓸면 지워져요.':'빈 10분 칸을 쭉 쓸고 무엇을 했는지 적어요 (예: 7:30~8:00 아침밥). 칠한 칸을 누르면 고치거나 지워요.'}),tt,sum,
     doneHere.length?[h('div',{class:'sec',text:'이 날 끝낸 다른 일 '+doneHere.length}),h('div',{class:'list'},doneHere.map(t=>taskRow(t)))]:null,
     fromWeek.length?[h('div',{class:'sec',text:'이번 주에서 가져오기 '+fromWeek.length}),h('div',{class:'list'},fromWeek.map(t=>h('div',{class:'row'},h('div',{class:'top'},h('span',{class:'txt',text:t.text}),h('button',{class:'chip on',type:'button',text:'이 날로',on:{click:()=>{setDay(t,d);save();render()}}})))))]:null];
 }
@@ -545,6 +634,9 @@ function editSheet(t){
         D.reps.push(r);D.tasks.splice(D.tasks.indexOf(t),1);
         save();ensureRepeats(st.y,st.m);close();render();toast(repLabel(r)+' 반복으로 만들었어요');return}
       save();close();render()}}}),
+    t.day&&!rep?h('button',{class:'btn',type:'button',text:'🎂 기념일로 바꾸기 (날짜 옆에 작게 표시)',on:{click:()=>{
+      const D=data();D.annivs.push({id:uid(),name:t.text.slice(0,12),date:t.day,yearly:true});D.tasks.splice(D.tasks.indexOf(t),1);
+      save();close();rerender();toast('매년 '+(+t.day.slice(5,7))+'월 '+(+t.day.slice(8))+'일 기념일로 바꿨어요')}}}):null,
     !t.done&&t.day?h('button',{class:'btn',type:'button',text:'내일로 미루기',on:{click:()=>{const x=parse(t.day);x.setDate(x.getDate()+1);
       if(rep){rep.skip=(rep.skip||[]).concat(t.day);t.rep=null}
       setDay(t,ymd(x));save();close();render();toast(md(t.day)+'로 미뤘어요')}}}):null,
@@ -590,6 +682,8 @@ function settingsSheet(){
   const today=D.tasks.filter(t=>t.day===t0).sort(byTime);
   const left=today.filter(t=>!t.done);
   const body=h('div');
+  const hourSel=(k,v)=>{const x=h('select',{id:'s'+k,class:'hsel','aria-label':k==='hFrom'?'시작 시간':'끝 시간',on:{change:e=>{S[k]=+e.target.value;if(S.hFrom>S.hTo){const t=S.hFrom;S.hFrom=S.hTo;S.hTo=t}save();draw()}}},
+    Array.from({length:24},(_,i)=>{const o=h('option',{value:String(i),text:i+'시'});if(i===v)o.selected=true;return o}));return x};
   const draw=()=>{
     const w=h('div',{class:'widget'},h('div',{class:'wh'},h('span',{text:'덤푸 · 오늘 '+md(t0)}),h('span',{text:(today.length-left.length)+'/'+today.length})),
       today.length?today.slice(0,4).map(t=>h('div',{class:'wr'},h('button',{class:'ck'+(t.done?' on':''),type:'button','aria-label':'완료',on:{click:()=>{t.done=!t.done;t.doneAt=t.done?t0:null;save();render();settingsSheet()}}},t.done?'✓':''),h('span',{text:(t.time?t.time+' ':'')+t.text,style:t.done?'text-decoration:line-through;color:var(--muted)':''}))):h('div',{class:'wr',style:'color:var(--muted)',text:'오늘 할 일이 없어요'}));
@@ -608,6 +702,10 @@ function settingsSheet(){
       h('div',{class:'sec',text:'아침 알림'}),
       h('div',{class:'set'},h('span',null,'매일 아침 오늘 할 일 알려주기',h('small',{text:B?'정한 시간에 오늘 할 일을 알려줘요':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'})),sw),
       S.alarm?h('div',{class:'set'},h('span',{text:'알림 시간'}),tm):null,preview,
+      h('div',{class:'sec',text:'매시간 기록 알림'}),
+      h('div',{class:'set'},h('span',null,'"지난 1시간 뭐 했어요?" 알림',h('small',{text:B?'정한 시간 동안 매시 정각쯤 알려줘요. 이미 적은 시간은 건너뛰어요.':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'})),
+        h('button',{type:'button',class:'sw'+(S.hourly?' on':''),'aria-label':'매시간 기록 알림',on:{click:()=>{S.hourly=!S.hourly;if(S.hourly&&B&&!demo)B.requestNoti();save();draw()}}})),
+      S.hourly?h('div',{class:'set'},h('span',{text:'알림 받을 시간'}),hourSel('hFrom',S.hFrom),h('span',{text:'~',style:'flex:none'}),hourSel('hTo',S.hTo)):null,
       h('div',{class:'sec',text:'10분 플래너 시간'}),
       h('div',{class:'set'},h('span',null,'새벽 시간 보기',h('small',{text:'0시부터 보여요 (새벽에 하루를 시작할 때)'})),h('button',{type:'button',class:'sw'+(S.early?' on':''),'aria-label':'새벽 시간 보기',on:{click:()=>{S.early=!S.early;save();render();draw()}}})),
       h('div',{class:'set'},h('span',null,'밤 시간 보기',h('small',{text:'23시까지 보여요'})),h('button',{type:'button',class:'sw'+(S.late?' on':''),'aria-label':'밤 시간 보기',on:{click:()=>{S.late=!S.late;save();render();draw()}}})),
@@ -745,7 +843,7 @@ function paintCell(el){
   D.logs[PT.day]=D.logs[PT.day]||{};const L=D.logs[PT.day];
   if(PT.mode==='erase'){
     const it=logItem(L[slot]);
-    if(PT.cat!=null?(it&&it.kind==='e'&&it.tag===PT.cat):L[slot]===PT.val){delete L[slot];el.className=el.className.replace(/ c\d| cn/g,'')}
+    if(PT.qt!=null?(it&&it.kind==='e'&&it.text===PT.qt):PT.cat!=null?(it&&it.kind==='e'&&it.tag===PT.cat):L[slot]===PT.val){delete L[slot];el.className=el.className.replace(/ c\d| cn/g,'')}
     return}
   L[slot]=PT.val;const it=logItem(PT.val);el.className=el.className.replace(/ c\d| cn/g,'')+(it?' '+itemCls(it):'');
 }
@@ -755,11 +853,16 @@ function paintStart(e){
   const el=e.target.closest('.tt-g .cell');if(!el)return;
   const tt=el.closest('.tt');if(!tt)return;
   if(e.cancelable)e.preventDefault();
-  PT.day=tt.dataset.day;PT.on=true;PT.moved=false;PT.cat=null;
+  PT.day=tt.dataset.day;PT.on=true;PT.moved=false;PT.cat=null;PT.qt=null;
   const slot=+el.dataset.slot;PT.a=PT.b=slot;
   const L=(data().logs||{})[PT.day]||{};
   if(st.brush==null){PT.mode='sel';markPick();return}
-  if(st.brush.startsWith('cat:')){
+  if(st.brush.startsWith('q:')){
+    const q=quickList()[+st.brush.slice(2)];if(!q){PT.on=false;return}
+    PT.qt=q.text;const it=logItem(L[slot]);
+    if(it&&it.kind==='e'&&it.text===q.text)PT.mode='erase';
+    else{PT.mode='paint';const id=uid();ents()[id]={text:q.text,tag:q.tag};PT.val='e:'+id}
+  }else if(st.brush.startsWith('cat:')){
     const i=+st.brush.slice(4);PT.cat=i;const it=logItem(L[slot]);
     if(it&&it.kind==='e'&&it.tag===i)PT.mode='erase';
     else{PT.mode='paint';const id=uid();ents()[id]={text:tagName(i),tag:i};PT.val='e:'+id}
@@ -866,9 +969,10 @@ function importData(o){
       out.ents[id]={text,tag:Number.isInteger(e.tag)&&e.tag>=0&&e.tag<8?e.tag:null}}}
   for(const day in out.logs){const o=out.logs[day];for(const k in o)if(o[k].startsWith('e:')&&!out.ents[o[k].slice(2)])delete o[k];if(!Object.keys(o).length)delete out.logs[day]}
   const S=d.settings||{};
-  out.settings.alarm=S.alarm===true;out.settings.time=isTime(S.time)?S.time:'08:00';out.settings.hol=S.hol!==false;out.settings.early=S.early===true;out.settings.late=S.late===true;
+  out.settings.alarm=S.alarm===true;out.settings.time=isTime(S.time)?S.time:'08:00';out.settings.hol=S.hol!==false;out.settings.early=S.early===true;out.settings.late=S.late===true;out.settings.palV=2;out.settings.hourly=S.hourly===true;out.settings.hFrom=Number.isInteger(S.hFrom)&&S.hFrom>=0&&S.hFrom<24?S.hFrom:9;out.settings.hTo=Number.isInteger(S.hTo)&&S.hTo>=0&&S.hTo<24?S.hTo:22;
   if(Array.isArray(S.tags)&&S.tags.length){out.settings.tags=S.tags.slice(0,8).map((x,i)=>cleanStr(x,8).trim()||('카테고리'+(i+1)))}
   out.settings.tagColor=out.settings.tags.map((_,i)=>Array.isArray(S.tagColor)&&Number.isInteger(S.tagColor[i])&&S.tagColor[i]>=0&&S.tagColor[i]<8?S.tagColor[i]:i%8);
+  if(S.palV!==2){const MAP=[4,3,1,6,5,2,3,7];out.settings.tagColor=out.settings.tagColor.map(o=>MAP[o])}
   const nT=out.settings.tags.length;out.tasks.forEach(t=>{if(t.tag!=null&&t.tag>=nT)t.tag=null});Object.values(out.ents).forEach(e=>{if(e.tag!=null&&e.tag>=nT)e.tag=null});out.reps.forEach(r=>{if(r.tag!=null&&r.tag>=nT)r.tag=null});
   return out;
 }
@@ -919,5 +1023,6 @@ syncNative();
 if(window.AppInfo)AppInfo.init();
 function onBack2App(){applyWidgetOps();render();syncNative()}
 window.__onResume=onBack2App;
+window.__openDaily=function(){closePop();if(closeLayer)closeLayer();st.day=todayS();st.tab='daily';render();setTimeout(()=>{const n=document.querySelector('.tt-r.now');if(n)n.scrollIntoView({block:'center'})},50)};
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')onBack2App()});
 })();

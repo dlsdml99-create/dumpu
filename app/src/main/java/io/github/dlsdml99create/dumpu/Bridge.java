@@ -1,11 +1,18 @@
 package io.github.dlsdml99create.dumpu;
 
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import android.os.Build;
+import android.provider.MediaStore;
+import android.util.Base64;
 import android.webkit.JavascriptInterface;
 
-/** 앱 화면(자바스크립트)과 폰 기능을 잇는 다리. 화면에서 부를 수 있는 건 아래 6개뿐. */
+import java.io.OutputStream;
+
+/** 앱 화면(자바스크립트)과 폰 기능을 잇는 다리. 화면에서 부를 수 있는 건 아래 7개뿐. */
 public class Bridge {
     private final MainActivity act;
 
@@ -46,6 +53,49 @@ public class Bridge {
                 act.startActivity(Intent.createChooser(i, "덤푸 백업 보내기"));
             } catch (Exception ignored) { }
         });
+    }
+
+    /**
+     * 데일리 그림(PNG)을 사진첩 Pictures/덤푸 에 저장하고, share 면 공유 창을 띄운다.
+     * 안드로이드 10 이상만 (권한 없이 저장 가능). 반환: ok / old / fail
+     */
+    @JavascriptInterface
+    public String saveImage(String b64, boolean share) {
+        if (Build.VERSION.SDK_INT < 29) return "old";
+        if (b64 == null || b64.length() > 12_000_000) return "fail";
+        try {
+            byte[] png = Base64.decode(b64, Base64.DEFAULT);
+            if (png.length < 8 || (png[0] & 0xFF) != 0x89 || png[1] != 'P' || png[2] != 'N' || png[3] != 'G') return "fail"; // PNG 만
+            ContentResolver cr = act.getContentResolver();
+            ContentValues v = new ContentValues();
+            v.put(MediaStore.Images.Media.DISPLAY_NAME, "dumpu-" + System.currentTimeMillis() + ".png");
+            v.put(MediaStore.Images.Media.MIME_TYPE, "image/png");
+            v.put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/덤푸");
+            v.put(MediaStore.Images.Media.IS_PENDING, 1);
+            Uri uri = cr.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, v);
+            if (uri == null) return "fail";
+            try (OutputStream os = cr.openOutputStream(uri)) {
+                if (os == null) return "fail";
+                os.write(png);
+            }
+            v.clear();
+            v.put(MediaStore.Images.Media.IS_PENDING, 0);
+            cr.update(uri, v, null, null);
+            if (share) {
+                act.runOnUiThread(() -> {
+                    try {
+                        Intent i = new Intent(Intent.ACTION_SEND);
+                        i.setType("image/png");
+                        i.putExtra(Intent.EXTRA_STREAM, uri);
+                        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        act.startActivity(Intent.createChooser(i, "덤푸 그림 보내기"));
+                    } catch (Exception ignored) { }
+                });
+            }
+            return "ok";
+        } catch (Exception e) {
+            return "fail";
+        }
     }
 
     /** 이 앱의 GitHub 페이지·다운로드 주소만 밖(브라우저)에서 연다. */

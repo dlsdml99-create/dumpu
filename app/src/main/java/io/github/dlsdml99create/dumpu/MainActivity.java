@@ -2,6 +2,7 @@ package io.github.dlsdml99create.dumpu;
 
 import android.Manifest;
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Insets;
 import android.net.Uri;
@@ -22,6 +23,7 @@ public class MainActivity extends Activity {
     static final String START = "https://" + HOST + "/assets/index.html";
 
     private WebView web;
+    private boolean openDaily = false;
     private WebViewAssetLoader loader;
 
     @Override
@@ -73,6 +75,11 @@ public class MainActivity extends Activity {
             }
 
             @Override
+            public void onPageFinished(WebView view, String url) {
+                runOpenDaily();
+            }
+
+            @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest req) {
                 Uri u = req.getUrl();
                 if (HOST.equals(u.getHost())) return false;
@@ -81,6 +88,7 @@ public class MainActivity extends Activity {
             }
         });
 
+        openDaily = "daily".equals(getIntent().getStringExtra("open"));
         if (saved != null) web.restoreState(saved);
         else web.loadUrl(START);
     }
@@ -97,6 +105,19 @@ public class MainActivity extends Activity {
         web.onResume();
         // 위젯에서 체크한 것을 화면에 반영
         web.evaluateJavascript("window.__onResume&&window.__onResume()", null);
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        if ("daily".equals(intent.getStringExtra("open"))) { openDaily = true; runOpenDaily(); }
+    }
+
+    private void runOpenDaily() {
+        if (!openDaily || web == null) return;
+        web.evaluateJavascript("(window.__openDaily&&(window.__openDaily(),true))?'1':'0'", v -> {
+            if ("\"1\"".equals(v)) openDaily = false;
+        });
     }
 
     @Override
