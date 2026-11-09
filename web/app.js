@@ -13,7 +13,7 @@ const mkOf=s=>s.slice(0,7);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const isDate=s=>{if(typeof s!=='string'||!/^\d{4}-\d\d-\d\d$/.test(s))return false;const d=parse(s);return ymd(d)===s&&d.getFullYear()>=2000&&d.getFullYear()<=2100};
 const isTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
-const blank=()=>({tasks:[],reps:[],annivs:[],settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[0,1,2],hol:true}});
+const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[0,1,2],hol:true,early:false,late:false}});
 
 // ── 공휴일 (한국천문연구원 월력요항·정부 발표 기준, 2026~2028)
 const HOL={
@@ -62,6 +62,7 @@ try{const v=JSON.parse(localStorage.getItem(KEY)||'null');if(v&&Array.isArray(v.
 // 예전 버전 데이터 고치기: 매주 반복이 요일 하나였던 것 → 여러 요일
 for(const r of real.reps){if(r.type==='week'&&!Array.isArray(r.dows))r.dows=[r.dow|0]}
 if(!Array.isArray(real.annivs))real.annivs=[];
+if(!real.logs||typeof real.logs!=='object'||Array.isArray(real.logs))real.logs={};
 {const S=real.settings;if(!Array.isArray(S.tags)||!S.tags.length)S.tags=['회사','집','약속'];S.tags=S.tags.slice(0,8);
  if(!Array.isArray(S.tagColor))S.tagColor=[];S.tags.forEach((_,i)=>{if(!(S.tagColor[i]>=0&&S.tagColor[i]<8))S.tagColor[i]=i%8});S.tagColor.length=S.tags.length}
 let demo=null;
@@ -338,18 +339,36 @@ function vDaily(){
   function go(){const n=addTasks(inp.value,{week:wi,day:d,month:mkOf(d)});if(n){render();toast('추가했어요')}}
   const shift=k=>{const x=parse(d);x.setDate(x.getDate()+k);st.day=ymd(x);render()};
   const fromWeek=data().tasks.filter(t=>t.month===mkOf(d)&&t.week===wi&&!t.day&&!t.done);
-  // 타임라인: 기본 7시~22시, 더 이르거나 늦은 일이 있으면 넓힘
+  // 10분 플래너: 왼쪽 계획(그 시간 할 일) | 시간 | 오른쪽 10분 칸 6개(실제로 한 시간, 손가락으로 칠하기)
+  const S=data().settings;
   const hrs=timed.map(t=>+t.time.slice(0,2));
-  const h0=Math.min(7,...hrs),h1=Math.max(22,...hrs);
-  const nowH=d===todayS()?new Date().getHours():-1;
-  const tl=h('div',{class:'tl'});
+  const h0=Math.min(S.early?0:7,...hrs),h1=Math.max(S.late?23:22,...hrs);
+  const nowH=d===todayS()?new Date().getHours():-1,nowM=new Date().getMinutes();
+  const log=(data().logs||{})[d]||{};
+  const byId=id=>data().tasks.find(t=>t.id===id);
+  if(st.brush&&!ts.some(t=>t.id===st.brush))st.brush=null;
+  const tt=h('div',{class:'tt','data-day':d},
+    h('div',{class:'tt-r tt-head'},h('span',{class:'tt-p',text:'계획'}),h('span',{class:'tt-h'}),h('div',{class:'tt-g'},[10,20,30,40,50,60].map(m=>h('span',{class:'cell-l',text:m})))),
+    !S.early&&h0>0?h('button',{type:'button',class:'tt-more',text:'▲ 새벽 시간 보기 (0~6시)',on:{click:()=>{S.early=true;save();render()}}}):null);
   for(let hh=h0;hh<=h1;hh++){
     const at=timed.filter(t=>+t.time.slice(0,2)===hh);
-    tl.append(h('div',{class:'tl-r'+(hh===nowH?' now':''),'data-drop':'hour:'+hh},
-      h('span',{class:'tl-h',text:hh+'시'}),
-      h('div',{class:'tl-c'},at.length?at.map(t=>taskRow(t,null,{noDay:true})):
-        h('button',{type:'button',class:'tl-add','aria-label':hh+'시에 추가',text:'+',on:{click:()=>{inp.value=hh+':00 ';inp.focus()}}}))));
+    tt.append(h('div',{class:'tt-r'+(hh===nowH?' now':'')},
+      h('div',{class:'tt-p','data-drop':'hour:'+hh},at.length?at.map(t=>taskRow(t,null,{noDay:true})):
+        h('button',{type:'button',class:'tl-add','aria-label':hh+'시에 추가',text:'+',on:{click:()=>{inp.value=hh+':00 ';inp.focus()}}})),
+      h('span',{class:'tt-h',text:String(hh)}),
+      h('div',{class:'tt-g'},[0,1,2,3,4,5].map(k=>{const slot=hh*6+k;const t=log[slot]?byId(log[slot]):null;
+        return h('span',{class:'cell'+(t?(hasTag(t)?' c'+colOf(t.tag):' cn'):'')+(hh===nowH&&Math.floor(nowM/10)===k?' cur':''),'data-slot':slot,title:t?t.text:null})}))));
   }
+  if(!S.late&&h1<23)tt.append(h('button',{type:'button',class:'tt-more',text:'▼ 밤 시간 보기 (23시)',on:{click:()=>{S.late=true;save();render()}}}));
+  if(S.early||S.late)tt.append(h('button',{type:'button',class:'tt-more',text:'기본 시간(7~22시)만 보기',on:{click:()=>{S.early=false;S.late=false;save();render()}}}));
+  // 칠할 것 고르기 + 실제로 한 시간 합계
+  const brush=h('div',{class:'brush'},h('span',{class:'lb',text:'칠하기'}),
+    ts.length?ts.map(t=>h('button',{type:'button',class:'chip'+(st.brush===t.id?' on':''),on:{click:()=>{st.brush=st.brush===t.id?null:t.id;render()}}},h('i',{class:hasTag(t)?'c'+colOf(t.tag):'cn'}),t.text.slice(0,10))):h('span',{class:'lb',text:'할 일을 먼저 적어요'}));
+  const cnt={};for(const k in log)cnt[log[k]]=(cnt[log[k]]||0)+1;
+  const ids=Object.keys(cnt).filter(id=>byId(id)).sort((a,b)=>cnt[b]-cnt[a]);
+  const total=ids.reduce((n,id)=>n+cnt[id],0)*10;
+  const hm=m=>(m>=60?Math.floor(m/60)+'시간 ':'')+(m%60?m%60+'분':'');
+  const sum=ids.length?h('div',{class:'tsum'},h('b',{text:'실제로 한 시간 '+hm(total)}),ids.map(id=>{const t=byId(id);return h('span',null,h('i',{class:hasTag(t)?'c'+colOf(t.tag):'cn'}),t.text.slice(0,12)+' '+hm(cnt[id]*10))})):null;
   const labs=labelsOf(d);
   return [h('div',{class:'head'},h('div',{class:'num',text:String(dt.getDate())}),
       h('div',{class:'t'},h('b',{text:'데일리'}),h('span',{text:(dt.getMonth()+1)+'월 '+(wi+1)+'주차 · '+DOW[dowOf(d)]+'요일'+(d===todayS()?' · 오늘':'')}),labs.length?h('div',null,labelSpans(d,'lab big')):null),
@@ -358,8 +377,8 @@ function vDaily(){
     h('div',{class:'add'},inp,h('button',{class:'go',type:'button',text:'추가',on:{click:go}})),tagPicker(),
     h('p',{class:'hint',text:'앞에 시간을 쓰면(3시 병원) 타임라인에 들어가요.'},d!==todayS()?[' ',h('button',{type:'button',style:'color:var(--cobalt);font-weight:700',text:'오늘로 가기',on:{click:()=>{st.day=todayS();render()}}})]:null),
     !ts.length?emptyBox('이 날 할 일이 없어요. 위클리에서 요일을 누르거나 위에 바로 적어요.'):null,
-    untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 타임라인으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true})))]:null,
-    h('div',{class:'sec',text:'타임라인'+(timed.length?' '+timed.length:'')}),tl,
+    untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 아래 계획 칸으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true})))]:null,
+    h('div',{class:'sec',text:'10분 플래너'}),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:st.brush?'오른쪽 칸을 손가락으로 쓸면 "'+(byId(st.brush)||{text:''}).text.slice(0,10)+'"을 한 시간이 칠해져요. 칠한 칸을 다시 쓸면 지워져요.':'위에서 할 일을 고르고, 오른쪽 10분 칸을 쓸어서 실제로 한 시간을 칠해요. 왼쪽 계획 칸에는 할 일을 끌어다 놓아요.'}),tt,sum,
     doneHere.length?[h('div',{class:'sec',text:'이 날 끝낸 다른 일 '+doneHere.length}),h('div',{class:'list'},doneHere.map(t=>taskRow(t)))]:null,
     fromWeek.length?[h('div',{class:'sec',text:'이번 주에서 가져오기 '+fromWeek.length}),h('div',{class:'list'},fromWeek.map(t=>h('div',{class:'row'},h('div',{class:'top'},h('span',{class:'txt',text:t.text}),h('button',{class:'chip on',type:'button',text:'이 날로',on:{click:()=>{setDay(t,d);save();render()}}})))))]:null];
 }
@@ -546,6 +565,9 @@ function settingsSheet(){
       h('div',{class:'sec',text:'아침 알림'}),
       h('div',{class:'set'},h('span',null,'매일 아침 오늘 할 일 알려주기',h('small',{text:B?'정한 시간에 오늘 할 일을 알려줘요':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'})),sw),
       S.alarm?h('div',{class:'set'},h('span',{text:'알림 시간'}),tm):null,preview,
+      h('div',{class:'sec',text:'10분 플래너 시간'}),
+      h('div',{class:'set'},h('span',null,'새벽 시간 보기',h('small',{text:'0시부터 보여요 (새벽에 하루를 시작할 때)'})),h('button',{type:'button',class:'sw'+(S.early?' on':''),'aria-label':'새벽 시간 보기',on:{click:()=>{S.early=!S.early;save();render();draw()}}})),
+      h('div',{class:'set'},h('span',null,'밤 시간 보기',h('small',{text:'23시까지 보여요'})),h('button',{type:'button',class:'sw'+(S.late?' on':''),'aria-label':'밤 시간 보기',on:{click:()=>{S.late=!S.late;save();render();draw()}}})),
       h('div',{class:'sec',text:'달력'}),
       h('div',{class:'set'},h('span',null,'공휴일·기념일 표시',h('small',{text:'설날·추석·대체공휴일, 어버이날 등 (2026~2028년)'})),hsw),
       h('div',{class:'sec',text:'기념일·생일 '+D.annivs.length}),
@@ -669,6 +691,39 @@ document.addEventListener('mouseup',e=>{if(DR.kind)dragEnd(e)});
 document.addEventListener('click',e=>{if(Date.now()<DR.until){e.stopPropagation();e.preventDefault()}},true);
 document.addEventListener('contextmenu',e=>{if(e.target.closest('[data-tid]')&&(DR.on||Date.now()<DR.until))e.preventDefault()});
 
+// ── 10분 칸 칠하기: 누른 칸이 비었으면 칠하기, 칠해져 있으면 지우기로 쭉 이어감
+const PT={on:false,mode:null,day:null};
+function paintCell(el){
+  if(!el||!el.dataset.slot)return;
+  const D=data(),slot=+el.dataset.slot;if(!(slot>=0&&slot<144))return;
+  D.logs[PT.day]=D.logs[PT.day]||{};const L=D.logs[PT.day];
+  const t=D.tasks.find(x=>x.id===st.brush);
+  el.className=el.className.replace(/ c\d| cn/g,'');
+  if(PT.mode==='paint'&&t){L[slot]=t.id;el.classList.add(hasTag(t)?'c'+colOf(t.tag):'cn')}else delete L[slot];
+}
+function paintStart(e){
+  const el=e.target.closest('.tt-g .cell');if(!el)return;
+  const tt=el.closest('.tt');if(!tt)return;
+  if(!st.brush){toast('위 "칠하기"에서 할 일을 먼저 골라요');return}
+  if(e.cancelable)e.preventDefault();
+  PT.day=tt.dataset.day;const L=(data().logs||{})[PT.day]||{};
+  PT.mode=L[+el.dataset.slot]===st.brush?'erase':'paint';PT.on=true;
+  paintCell(el);
+}
+function paintMove(e){
+  if(!PT.on)return;if(e.cancelable)e.preventDefault();
+  const p=e.touches?e.touches[0]:e;const el=document.elementFromPoint(p.clientX,p.clientY);
+  paintCell(el&&el.closest('.tt-g .cell'));
+}
+function paintEnd(){if(!PT.on)return;PT.on=false;if(!data().logs[PT.day]||!Object.keys(data().logs[PT.day]).length)delete data().logs[PT.day];save();render()}
+document.addEventListener('touchstart',paintStart,{passive:false});
+document.addEventListener('touchmove',paintMove,{passive:false});
+document.addEventListener('touchend',paintEnd);
+document.addEventListener('touchcancel',paintEnd);
+document.addEventListener('mousedown',e=>{if(e.button===0&&!('ontouchstart' in window))paintStart(e)});
+document.addEventListener('mousemove',e=>{if(PT.on)paintMove(e)});
+document.addEventListener('mouseup',paintEnd);
+
 // ── 백업: 내보내기·가져오기 (폰을 바꿀 때)
 function exportSheet(){
   const code=JSON.stringify({app:'dumpu',v:1,at:new Date().toISOString(),data:real});
@@ -704,8 +759,11 @@ function importData(o){
     const x={id:a.id,name,date:a.date,yearly:a.yearly!==false};
     if(a.lunar===true&&Number.isInteger(a.lm)&&a.lm>=1&&a.lm<=12&&Number.isInteger(a.ld)&&a.ld>=1&&a.ld<=30){x.lunar=true;x.lm=a.lm;x.ld=a.ld}
     out.annivs.push(x)}
+  if(d.logs&&typeof d.logs==='object'&&!Array.isArray(d.logs)){let n=0;
+    for(const day in d.logs){if(!isDate(day)||++n>5000)continue;const v=d.logs[day];if(!v||typeof v!=='object')continue;const o={};
+      for(const k in v){const i=+k;if(Number.isInteger(i)&&i>=0&&i<144&&okId(v[k]))o[i]=v[k]}if(Object.keys(o).length)out.logs[day]=o}}
   const S=d.settings||{};
-  out.settings.alarm=S.alarm===true;out.settings.time=isTime(S.time)?S.time:'08:00';out.settings.hol=S.hol!==false;
+  out.settings.alarm=S.alarm===true;out.settings.time=isTime(S.time)?S.time:'08:00';out.settings.hol=S.hol!==false;out.settings.early=S.early===true;out.settings.late=S.late===true;
   if(Array.isArray(S.tags)&&S.tags.length){out.settings.tags=S.tags.slice(0,8).map((x,i)=>cleanStr(x,8).trim()||('카테고리'+(i+1)))}
   out.settings.tagColor=out.settings.tags.map((_,i)=>Array.isArray(S.tagColor)&&Number.isInteger(S.tagColor[i])&&S.tagColor[i]>=0&&S.tagColor[i]<8?S.tagColor[i]:i%8);
   const nT=out.settings.tags.length;out.tasks.forEach(t=>{if(t.tag!=null&&t.tag>=nT)t.tag=null});out.reps.forEach(r=>{if(r.tag!=null&&r.tag>=nT)r.tag=null});
@@ -739,7 +797,7 @@ function stepBy(k){
   const el=document.getElementById('app');
   el.addEventListener('touchstart',e=>{
     if(e.touches.length!==1||closeLayer||(window.AppInfo&&AppInfo.isOpen())||st.pick){x0=null;return}
-    if(e.target.closest('input,textarea,.weeks,.hgrid,.tl-add')){x0=null;return}
+    if(e.target.closest('input,textarea,.weeks,.hgrid,.tl-add,.tt-g,.brush')){x0=null;return}
     x0=e.touches[0].clientX;y0=e.touches[0].clientY;t0=Date.now()},{passive:true});
   el.addEventListener('touchend',e=>{
     if(x0==null)return;if(DR.on||Date.now()<DR.until){x0=null;return}const t=e.changedTouches[0];const dx=t.clientX-x0,dy=t.clientY-y0;x0=null;
