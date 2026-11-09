@@ -13,7 +13,7 @@ const mkOf=s=>s.slice(0,7);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const isDate=s=>{if(typeof s!=='string'||!/^\d{4}-\d\d-\d\d$/.test(s))return false;const d=parse(s);return ymd(d)===s&&d.getFullYear()>=2000&&d.getFullYear()<=2100};
 const isTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
-const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
+const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},diary:{},settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
 
 // ── 공휴일 (한국천문연구원 월력요항·정부 발표 기준, 2026~2028)
 const HOL={
@@ -64,6 +64,7 @@ for(const r of real.reps){if(r.type==='week'&&!Array.isArray(r.dows))r.dows=[r.d
 if(!Array.isArray(real.annivs))real.annivs=[];
 if(!real.logs||typeof real.logs!=='object'||Array.isArray(real.logs))real.logs={};
 if(!real.ents||typeof real.ents!=='object'||Array.isArray(real.ents))real.ents={};
+if(!real.diary||typeof real.diary!=='object'||Array.isArray(real.diary))real.diary={};
 {const S=real.settings;if(!Array.isArray(S.tags)||!S.tags.length)S.tags=['회사','집','약속'];S.tags=S.tags.slice(0,8);
  if(!Array.isArray(S.tagColor))S.tagColor=[];S.tags.forEach((_,i)=>{if(!(S.tagColor[i]>=0&&S.tagColor[i]<8))S.tagColor[i]=i%8});S.tagColor.length=S.tags.length
  if(S.palV!==2){const MAP=[4,3,1,6,5,2,3,7];S.tagColor=S.tagColor.map(o=>MAP[o]);S.palV=2} // 예전 색(파랑·청록·주황·분홍·보라·노랑·초록·회색) → 가장 비슷한 새 색
@@ -79,7 +80,7 @@ function syncNative(){
   try{
     const days={};const base=parse(todayS());
     for(let i=0;i<14;i++){const x=new Date(base);x.setDate(base.getDate()+i);const s=ymd(x);
-      days[s]=real.tasks.filter(t=>t.day===s).sort(byTime).slice(0,30).map(t=>({id:t.id,text:((t.time?t.time+' ':'')+t.text).slice(0,60),done:!!t.done}))}
+      days[s]=real.tasks.filter(t=>t.day===s).sort(byTime).slice(0,30).map(t=>({id:t.id,text:((t.time?t.time+' ':'')+t.text).slice(0,60),done:!!t.done,r:!!t.rep}))}
     const t0=todayS(),L=real.logs[t0]||{},filled=[];
     for(let hh=0;hh<24;hh++){let n=0;for(let k=0;k<6;k++)if(L[hh*6+k])n++;if(n>=3)filled.push(hh)} // 반 이상 적은 시간은 안 물어봄
     const S=real.settings;
@@ -242,7 +243,8 @@ function dayImage(d){
   let h0=S.early?0:7,h1=S.late?23:22;
   for(const t of timed){const x=+t.time.slice(0,2);if(x<h0)h0=x;if(x>h1)h1=x}
   for(const k in L){const x=Math.floor(+k/6);if(x<h0)h0=x;if(x>h1)h1=x}
-  const W=1080,RH=56,top=220+(untimed.length?60+Math.ceil(untimed.length/2)*44:0),H=top+(h1-h0+1)*RH+190;
+  const diary=((D.diary||{})[d]||'').slice(0,200);
+  const W=1080,RH=56,top=220+(untimed.length?60+Math.ceil(untimed.length/2)*44:0),H=top+(h1-h0+1)*RH+190+(diary?110:0);
   const c=document.createElement('canvas');c.width=W;c.height=H;const g=c.getContext('2d');
   const C={bg:cssVar('--paper'),card:cssVar('--card'),ink:cssVar('--ink'),mu:cssVar('--muted'),line:cssVar('--line'),acc:cssVar('--cobalt')};
   const col=it=>it&&okTag(it.tag)?cssVar('--t'+colOf(it.tag)):C.mu;
@@ -273,7 +275,10 @@ function dayImage(d){
   const St=statsFor([d]);let sy=y+(h1-h0+1)*RH+60;
   g.fillStyle=C.ink;g.font='800 32px '+F;g.fillText('실제로 한 시간 '+hm(St.total)+(St.planned?'  ·  계획 '+St.did+'/'+St.planned+' ('+Math.round(St.did/St.planned*100)+'%)':''),60,sy);
   g.font='500 26px '+F;g.fillStyle=C.mu;g.fillText(St.items.slice(0,4).map(x=>x.text.slice(0,8)+' '+hm(x.min)).join('  ·  '),60,sy+46);
-  g.textAlign='right';g.fillText('덤푸',W-60,H-30);g.textAlign='left';
+  if(diary){g.fillStyle=C.ink;g.font='italic 600 30px '+F;
+    const lines=[];let cur='';for(const ch of '“'+diary+'”'){if(g.measureText(cur+ch).width>W-120){lines.push(cur);cur=ch}else cur+=ch}lines.push(cur);
+    lines.slice(0,2).forEach((l,i)=>g.fillText(l,60,sy+110+i*40))}
+  g.textAlign='right';g.fillStyle=C.mu;g.font='500 26px '+F;g.fillText('덤푸',W-60,H-30);g.textAlign='left';
   const url=c.toDataURL('image/png');
   const close=sheet(h('h3',{text:md(d)+' 이미지'}),h('img',{src:url,alt:md(d)+' 10분 플래너 그림',class:'shot'}),
     B&&B.saveImage?[
@@ -283,6 +288,16 @@ function dayImage(d){
         if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'덤푸 '+md(d)}).catch(()=>{});
         else{const a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}})}}}),
      h('p',{text:'아이폰은 사진을 길게 눌러 "사진에 저장"해도 돼요.'})]);
+}
+// 한 줄 일기
+function diaryBox(d){
+  const ta=h('textarea',{id:'diary',rows:'2',maxlength:'200',class:'diary',placeholder:'오늘 어땠나요? 한 줄로 남겨요'});
+  ta.value=(data().diary||{})[d]||'';
+  let tm=null;
+  const keep=()=>{const v=ta.value.trim().slice(0,200);const D=data();D.diary=D.diary||{};if(v)D.diary[d]=v;else delete D.diary[d];save()};
+  ta.addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(keep,600)});
+  ta.addEventListener('blur',()=>{clearTimeout(tm);keep()});
+  return h('div',null,ta,h('p',{class:'hint',style:'margin:2px 0 0;text-align:right',text:'적으면 저절로 저장돼요 · 이미지에도 들어가요'}));
 }
 // 한 주 10분 기록 모아 보기 (잠·일·운동 패턴)
 function weekGrid(w){
@@ -310,6 +325,16 @@ function quickList(){
   quickCache=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]).slice(0,5).map(k=>meta[k]);
   return quickCache;
 }
+// 루틴 달성률: 반복 할 일별로 오늘까지 몇 번 했는지 (♥)
+function routineBox(days,label){
+  const D=data(),t0=todayS();
+  const upto=days.filter(d=>d<=t0);
+  if(!upto.length)return null;
+  const rows=D.reps.map(r=>{const inst=D.tasks.filter(t=>t.rep===r.id&&upto.includes(t.day));return {r,n:inst.length,done:inst.filter(t=>t.done).length}}).filter(x=>x.n);
+  if(!rows.length)return null;
+  return h('div',{class:'rbox'},h('b',{text:label+' 루틴'}),rows.map(x=>{const p=Math.round(x.done/x.n*100);const cls=okTag(x.r.tag)?colOf(x.r.tag):'n';
+    return h('div',{class:'rrow'},h('span',{class:'rn tc'+cls,text:'♥ '+x.r.text.slice(0,10)}),h('span',{class:'rbar'},h('i',{class:'c'+cls,style:'width:'+p+'%'})),h('span',{class:'rp',text:x.done+'/'+x.n+' · '+p+'%'}))}));
+}
 function actualBox(days,label){
   const S=statsFor(days);
   if(!S.total&&!S.planned)return null;
@@ -335,10 +360,10 @@ function calGrid(){
     const labs=labelsOf(d);const red=dowOf(d)===6||labs.some(l=>l.c==='hol');
     const dots=[...plain,...doneOther];
     grid.append(h('button',{type:'button',class:(out?'out ':'')+(d===t0?'today ':'')+(d===st.sel&&!st.pick?'sel ':'')+(red?'red ':dowOf(d)===5?'blue ':''),
-      'data-d':d,'data-drop':'day:'+d,'aria-label':md(d)+(labs.length?' '+labs.map(l=>l.t).join(' '):'')+' 할 일 '+todo.length+'개, 루틴 '+routine.filter(t=>t.done).length+'/'+routine.length+', 완료 '+dots.filter(t=>t.done).length+'개',on:{click:()=>calTap(d)}},
+      'data-d':d,'data-drop':'day:'+d,'aria-label':md(d)+(labs.length?' '+labs.map(l=>l.t).join(' '):'')+' 할 일 '+todo.length+'개, 루틴 '+routine.filter(t=>t.done).length+'/'+routine.length+', 완료 '+dots.filter(t=>t.done).length+'개',on:{click:e=>{const r=e.target.closest('.rt[data-rt]');if(r&&!st.pick){const t=data().tasks.find(x=>x.id===r.dataset.rt);if(t){toggle(t);return}}calTap(d)}}},
       h('span',{class:'dl'},h('span',{class:'d',text:String(dt.getDate())}),labs.length?h('span',{class:'lab '+labs[0].c,text:labs[0].t}):null),
       todo.length?h('span',{class:'mini p'+(hasTag(todo[0])?' tc'+colOf(todo[0].tag):''),text:todo[0].text}):null,
-      routine.length?h('span',{class:'rt-row'},routine.slice(0,5).map(t=>h('i',{class:'rt'+(t.done?' on':'')+' tc'+(hasTag(t)?colOf(t.tag):'n'),text:t.done?'♥':'♡'}))):null,
+      routine.length?h('span',{class:'rt-row'},routine.slice(0,5).map(t=>h('i',{class:'rt'+(t.done?' on':'')+' tc'+(hasTag(t)?colOf(t.tag):'n'),'data-tid':null,'data-rt':t.id,title:t.text+(t.done?' 했어요':' 안 했어요')+' · 누르면 바꿔요',text:t.done?'♥':'♡'}))):null,
       dots.length?h('span',{class:'mk'},dots.slice(0,6).map(t=>h('i',{class:(t.done?'':'p ')+(hasTag(t)?'c'+colOf(t.tag):'cn')}))):null))});
   return grid;
 }
@@ -369,6 +394,7 @@ function showPop(d){
       h('button',{type:'button',class:'pop-t','aria-pressed':t.done?'true':'false',on:{click:e=>{e.stopPropagation();toggle(t)},contextmenu:e=>{e.preventDefault();if(DR.on||Date.now()<DR.until)return;closePop();editSheet(t)}}},t.time?h('span',{class:'tm',text:t.time}):null,t.text))):h('p',{class:'pop-e',text:'할 일이 없어요'}),
     list.length?h('p',{class:'pop-e',text:'길게 눌러 다른 날짜로 끌어요'}):null,
     list.length>4?h('p',{class:'pop-e',text:'+'+(list.length-4)+'개 더'}):null,
+    (data().diary||{})[d]?h('p',{class:'pop-d',text:'“'+data().diary[d].slice(0,40)+'”'}):null,
     h('div',{class:'pop-a'},
       h('button',{type:'button',text:'+ 할 일',on:{click:e=>{e.stopPropagation();closePop();quickAdd(d)}}}),
       h('button',{type:'button',text:'+ 기념일',on:{click:e=>{e.stopPropagation();closePop();annivSheet(d)}}}),
@@ -416,6 +442,7 @@ function vMonthly(){
   return [h('div',{class:'mtop'},head('먼슬리',ts.length?ts.length+'개 중 '+done.length+'개 완료'+(unassigned?' · 안 정한 '+unassigned+'개':''):'달력 보며 할 일 정하기'),
     pickT?h('div',{class:'pickbar'},h('span',null,'"',h('b',{text:pickT.text.slice(0,20)}),'" 언제 할까요? 달력에서 날짜를 눌러 주세요'),h('button',{type:'button',text:'취소',on:{click:()=>{st.pick=null;render()}}})):null,
     calGrid()),
+    routineBox(weeksOf(st.y,st.m).flat().filter(x=>mkOf(x)===mKey()),'이번 달'),
     actualBox(weeksOf(st.y,st.m).flat().filter(x=>mkOf(x)===mKey()),'이번 달'),
     isThisMonth()?lateBox('month'):null,
     box,
@@ -444,7 +471,7 @@ function vWeekly(){
   const isNow=w.includes(t0);
   return [head('위클리',(st.week+1)+'주차 · '+(parse(w[0]).getMonth()+1)+'/'+parse(w[0]).getDate()+'~'+(parse(w[6]).getMonth()+1)+'/'+parse(w[6]).getDate()),
     h('div',{class:'weeks'},ws.map((_,i)=>h('button',{class:'chip'+(i===st.week?' on':''),type:'button',text:(i+1)+'주차',on:{click:()=>{st.week=i;render()}}}))),
-    isNow?lateBox('week'):null,strip,actualBox(w,'이번 주'),weekGrid(w),
+    isNow?lateBox('week'):null,strip,routineBox(w,'이번 주'),actualBox(w,'이번 주'),weekGrid(w),
     h('div',{class:'add'},inp,h('button',{class:'go',type:'button',text:'추가',on:{click:go}})),tagPicker(),
     ts.length?null:emptyBox('이 주에 정리된 할 일이 없어요. 먼슬리에서 주 버튼을 누르거나 위에 바로 적어요.'),
     undone.length?[h('div',{class:'sec',text:'할 일 '+undone.length+' · 요일 버튼이나 위 날짜 칸으로 끌어서 데일리로'}),h('div',{class:'list'},undone.map(row))]:null,
@@ -511,6 +538,7 @@ function vDaily(){
     !ts.length?emptyBox('이 날 할 일이 없어요. 위클리에서 요일을 누르거나 위에 바로 적어요.'):null,
     untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 아래 계획 칸으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true})))]:null,
     h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 이미지로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:bName?'오른쪽 칸을 쓸면 "'+bName+'"(으)로 칠해져요. 같은 걸 칠한 칸을 다시 쓸면 지워져요.':'빈 10분 칸을 쭉 쓸고 무엇을 했는지 적어요 (예: 7:30~8:00 아침밥). 칠한 칸을 누르면 고치거나 지워요.'}),tt,sum,
+    h('div',{class:'sec',text:'오늘의 한 줄'}),diaryBox(d),
     doneHere.length?[h('div',{class:'sec',text:'이 날 끝낸 다른 일 '+doneHere.length}),h('div',{class:'list'},doneHere.map(t=>taskRow(t)))]:null,
     fromWeek.length?[h('div',{class:'sec',text:'이번 주에서 가져오기 '+fromWeek.length}),h('div',{class:'list'},fromWeek.map(t=>h('div',{class:'row'},h('div',{class:'top'},h('span',{class:'txt',text:t.text}),h('button',{class:'chip on',type:'button',text:'이 날로',on:{click:()=>{setDay(t,d);save();render()}}})))))]:null];
 }
@@ -685,8 +713,9 @@ function settingsSheet(){
   const hourSel=(k,v)=>{const x=h('select',{id:'s'+k,class:'hsel','aria-label':k==='hFrom'?'시작 시간':'끝 시간',on:{change:e=>{S[k]=+e.target.value;if(S.hFrom>S.hTo){const t=S.hFrom;S.hFrom=S.hTo;S.hTo=t}save();draw()}}},
     Array.from({length:24},(_,i)=>{const o=h('option',{value:String(i),text:i+'시'});if(i===v)o.selected=true;return o}));return x};
   const draw=()=>{
-    const w=h('div',{class:'widget'},h('div',{class:'wh'},h('span',{text:'덤푸 · 오늘 '+md(t0)}),h('span',{text:(today.length-left.length)+'/'+today.length})),
-      today.length?today.slice(0,4).map(t=>h('div',{class:'wr'},h('button',{class:'ck'+(t.done?' on':''),type:'button','aria-label':'완료',on:{click:()=>{t.done=!t.done;t.doneAt=t.done?t0:null;save();render();settingsSheet()}}},t.done?'✓':''),h('span',{text:(t.time?t.time+' ':'')+t.text,style:t.done?'text-decoration:line-through;color:var(--muted)':''}))):h('div',{class:'wr',style:'color:var(--muted)',text:'오늘 할 일이 없어요'}));
+    const w=h('div',{class:'widget'},h('div',{class:'wh'},h('span',{text:'덤푸 · 오늘 '+md(t0)}),h('span',{text:(()=>{const nr=today.filter(t=>!t.rep);return nr.length?nr.filter(t=>t.done).length+'/'+nr.length:''})()})),
+      today.some(t=>t.rep)?h('div',{class:'wr',style:'color:var(--t6);font-weight:700',text:today.filter(t=>t.rep).map(t=>(t.done?'♥ ':'♡ ')+t.text).join('  ')}):null,
+      today.length?today.filter(t=>!t.rep).slice(0,4).map(t=>h('div',{class:'wr'},h('button',{class:'ck'+(t.done?' on':''),type:'button','aria-label':'완료',on:{click:()=>{t.done=!t.done;t.doneAt=t.done?t0:null;save();render();settingsSheet()}}},t.done?'✓':''),h('span',{text:(t.time?t.time+' ':'')+t.text,style:t.done?'text-decoration:line-through;color:var(--muted)':''}))):h('div',{class:'wr',style:'color:var(--muted)',text:'오늘 할 일이 없어요'}));
     const sw=h('button',{type:'button',class:'sw'+(S.alarm?' on':''),'aria-label':'아침 알림',on:{click:()=>{S.alarm=!S.alarm;if(S.alarm&&B&&!demo)B.requestNoti();save();draw()}}});
     const hsw=h('button',{type:'button',class:'sw'+(S.hol?' on':''),'aria-label':'공휴일 표시',on:{click:()=>{S.hol=!S.hol;save();render();draw()}}});
     const tm=h('input',{type:'time',id:'sTime',value:S.time,on:{change:e=>{S.time=isTime(e.target.value)?e.target.value:'08:00';save();draw()}}});
@@ -961,6 +990,7 @@ function importData(o){
     const x={id:a.id,name,date:a.date,yearly:a.yearly!==false};
     if(a.lunar===true&&Number.isInteger(a.lm)&&a.lm>=1&&a.lm<=12&&Number.isInteger(a.ld)&&a.ld>=1&&a.ld<=30){x.lunar=true;x.lm=a.lm;x.ld=a.ld}
     out.annivs.push(x)}
+  if(d.diary&&typeof d.diary==='object'&&!Array.isArray(d.diary)){let n=0;for(const k in d.diary){if(!isDate(k)||++n>20000)continue;const v=cleanStr(d.diary[k],200).trim();if(v)out.diary[k]=v}}
   if(d.logs&&typeof d.logs==='object'&&!Array.isArray(d.logs)){let n=0;
     for(const day in d.logs){if(!isDate(day)||++n>5000)continue;const v=d.logs[day];if(!v||typeof v!=='object')continue;const o={};
       for(const k in v){const i=+k,x=v[k];if(Number.isInteger(i)&&i>=0&&i<144&&typeof x==='string'&&(okId(x)||(/^e:/.test(x)&&okId(x.slice(2)))))o[i]=x}if(Object.keys(o).length)out.logs[day]=o}}

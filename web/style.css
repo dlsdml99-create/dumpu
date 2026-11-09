@@ -292,3 +292,17 @@ textarea.code{width:100%;font:12px/1.4 ui-monospace,monospace;border:1px solid v
 .imgbtn{font-size:12px;color:var(--cobalt);font-weight:700;margin-left:8px;letter-spacing:0}
 img.shot{width:100%;border:1px solid var(--line);border-radius:10px;margin:8px 0}
 .hsel{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:4px 6px;font:inherit;flex:none}
+
+/* v1.9: 루틴 달성률, ♥ 바로 체크, 한 줄 일기 */
+.rt-row{font-size:13px;gap:2px}
+.rt{cursor:pointer;padding:0 1px}
+.rbox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:10px 0;display:flex;flex-direction:column;gap:6px;font-size:13px}
+.rrow{display:grid;grid-template-columns:minmax(0,7em) 1fr auto;gap:8px;align-items:center}
+.rn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.rbar{height:8px;border-radius:4px;background:var(--line);overflow:hidden}
+.rbar i{display:block;height:100%}
+.rbar i.cn{background:var(--muted)}
+.rbar i.c0{background:var(--t0)}.rbar i.c1{background:var(--t1)}.rbar i.c2{background:var(--t2)}.rbar i.c3{background:var(--t3)}.rbar i.c4{background:var(--t4)}.rbar i.c5{background:var(--t5)}.rbar i.c6{background:var(--t6)}.rbar i.c7{background:var(--t7)}
+.rp{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+textarea.diary{width:100%;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;resize:vertical}
+.pop-d{margin:4px 0;font-size:12px;font-style:italic;color:var(--ink)}

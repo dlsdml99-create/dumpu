@@ -52,7 +52,21 @@ public class DumpuWidget extends AppWidgetProvider {
         v.setTextViewText(R.id.w_title, "덤푸 · 오늘 " + (cal.get(Calendar.MONTH) + 1) + "/" + cal.get(Calendar.DAY_OF_MONTH)
                 + "(" + DOW[cal.get(Calendar.DAY_OF_WEEK) - 1] + ")");
 
-        JSONArray a = Store.items(c, Store.today());
+        JSONArray all = Store.items(c, Store.today());
+        // 루틴(반복 할 일)은 위에 ♥ 줄로, 나머지만 체크 줄로
+        JSONArray a = new JSONArray();
+        StringBuilder rt = new StringBuilder();
+        for (int k = 0; k < all.length(); k++) {
+            JSONObject o = all.optJSONObject(k);
+            if (o == null) continue;
+            if (o.optBoolean("r")) {
+                if (rt.length() > 0) rt.append("  ");
+                rt.append(o.optBoolean("done") ? "♥ " : "♡ ").append(o.optString("text"));
+            } else a.put(o);
+        }
+        v.setTextViewText(R.id.w_rt, rt);
+        v.setViewVisibility(R.id.w_rt, rt.length() > 0 ? View.VISIBLE : View.GONE);
+        v.setOnClickPendingIntent(R.id.w_rt, openApp(c));
         int done = 0;
         for (int k = 0; k < a.length(); k++) if (a.optJSONObject(k) != null && a.optJSONObject(k).optBoolean("done")) done++;
         v.setTextViewText(R.id.w_count, a.length() == 0 ? "" : done + "/" + a.length());
@@ -60,7 +74,7 @@ public class DumpuWidget extends AppWidgetProvider {
         for (int k = 0; k < ROWS.length; k++) {
             JSONObject o = k < a.length() ? a.optJSONObject(k) : null;
             if (o == null) {
-                if (k == 0 && a.length() == 0) {
+                if (k == 0 && a.length() == 0 && rt.length() == 0) {
                     v.setViewVisibility(ROWS[k], View.VISIBLE);
                     v.setTextViewText(ROWS[k], "오늘 할 일이 없어요");
                     v.setOnClickPendingIntent(ROWS[k], openApp(c));

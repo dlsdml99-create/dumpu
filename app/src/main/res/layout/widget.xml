@@ -29,6 +29,16 @@
             android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
+    <TextView
+        android:id="@+id/w_rt"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingBottom="2dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="#E64980"
+        android:textSize="13sp"
+        android:visibility="gone" />
     <TextView android:id="@+id/w_r0" style="@style/WRow" />
     <TextView android:id="@+id/w_r1" style="@style/WRow" />
     <TextView android:id="@+id/w_r2" style="@style/WRow" />
