@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">덤푸</string>
+    <string name="widget_name">덤푸 오늘 할 일</string>
+    <string name="widget_desc">오늘 할 일을 앱을 안 열고 체크해요</string>
+    <string name="channel_name">아침 알림</string>
+</resources>

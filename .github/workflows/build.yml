@@ -1,0 +1,91 @@
+name: 앱 빌드
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'site/**'
+      - 'README.md'
+      - '.github/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+# 빌드와 페이지 배포는 차례로 (페이지가 예전 버전으로 덮이지 않게)
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 서명 키 준비
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+        run: |
+          if [ -z "${SIGNING_KEY:-}" ]; then
+            echo "::error::서명 키(SIGNING_KEY)가 없어요. 저장소 Settings → Secrets and variables → Actions 에 SIGNING_KEY 를 넣어 주세요."
+            exit 1
+          fi
+          pw="${SIGNING_KEY%%:*}"
+          echo "::add-mask::$pw"
+          printf '%s' "${SIGNING_KEY#*:}" | base64 -d > "$RUNNER_TEMP/dumpu.jks"
+          echo "KEYSTORE_PASSWORD=$pw" >> "$GITHUB_ENV"
+          echo "KEYSTORE_FILE=$RUNNER_TEMP/dumpu.jks" >> "$GITHUB_ENV"
+
+      - name: 버전 읽기
+        run: echo "VERSION=$(grep -oP 'name="app-version" content="\K[0-9]+\.[0-9]+' web/index.html)" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      - name: APK 만들기
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+
+      - name: APK 확인
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          if [ ! -f "$apk" ]; then echo "::error::서명된 APK가 만들어지지 않았어요"; exit 1; fi
+          cp "$apk" dumpu.apk
+          ls -la dumpu.apk
+          sha256sum dumpu.apk
+
+      - name: 릴리스 올리기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dumpu.apk --clobber
+          else
+            gh release create "$tag" dumpu.apk --title "덤푸 $tag" --notes "덤푸 $tag · 다운로드 페이지: https://dlsdml99-create.github.io/dumpu/" --latest
+          fi
+
+      - name: 다운로드 페이지 만들기
+        run: bash .github/make-site.sh
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.d.outputs.page_url }}
+    steps:
+      - id: d
+        uses: actions/deploy-pages@v4

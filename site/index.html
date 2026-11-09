@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>덤푸 - 먼슬리·위클리·데일리 플래너</title>
+<meta name="description" content="이번 달 할 일을 우다다 적고, 주차·요일 버튼으로 위클리·데일리에 정리하는 플래너 앱">
+<link rel="icon" href="icon.png">
+<style>
+:root{--paper:#FBFAF6;--card:#fff;--ink:#1A2340;--muted:#6B7290;--line:#E3E1D8;--cobalt:#1F3FA6;--lemon:#F3E37C;--soft:#EEF1FB;--grass:#2E8B57}
+@media (prefers-color-scheme:dark){:root{--paper:#12151F;--card:#1A1E2B;--ink:#E9EBF3;--muted:#9097B2;--line:#2A3042;--cobalt:#7E9BFF;--soft:#232A40;--grass:#5CC48B;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.65 system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+.w{max-width:680px;margin:0 auto;padding:28px max(18px,env(safe-area-inset-right,0px)) 60px max(18px,env(safe-area-inset-left,0px))}
+.hero{display:flex;gap:18px;align-items:center}
+.hero img{width:84px;height:84px;border-radius:22px;flex:none}
+h1{margin:0;font-size:34px;letter-spacing:-.03em}
+.sub{color:var(--muted);margin:2px 0 0}
+.btns{display:flex;flex-direction:column;gap:10px;margin:24px 0 8px}
+.b{display:block;text-align:center;text-decoration:none;border-radius:14px;padding:14px;font-weight:800;font-size:17px}
+.b.pri{background:var(--cobalt);color:var(--paper)}
+.b.sec{border:1.5px solid var(--line);color:var(--ink)}
+.meta{color:var(--muted);font-size:13px;text-align:center}
+h2{font-size:21px;margin:40px 0 10px;letter-spacing:-.02em;display:flex;align-items:center;gap:8px}
+h2 .n{font-size:12px;background:var(--soft);color:var(--cobalt);border-radius:999px;padding:2px 9px}
+h3{font-size:16px;margin:20px 0 4px}
+p,li{margin:6px 0}
+ul,ol{padding-left:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px 18px}
+.feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:10px}
+.feat div{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.feat b{display:block}
+.feat span{color:var(--muted);font-size:14px}
+.upd{border-left:3px solid var(--cobalt);padding-left:12px;margin:12px 0}
+.upd b{display:block;font-size:14px}
+.qr{display:flex;gap:14px;align-items:center;margin-top:14px}
+.qr img{width:110px;height:110px;border-radius:10px;flex:none}
+.qr p{color:var(--muted);font-size:14px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+td{border-top:1px solid var(--line);padding:8px 6px;vertical-align:top}
+td:first-child{font-weight:700;white-space:nowrap}
+code{background:var(--soft);border-radius:6px;padding:1px 6px;font-size:13px;word-break:break-all}
+footer{margin-top:40px;color:var(--muted);font-size:13px}
+</style>
+</head>
+<body>
+<div class="w">
+  <div class="hero">
+    <img src="icon.png" alt="덤푸 아이콘">
+    <div>
+      <h1>덤푸</h1>
+      <p class="sub">한 달 할 일을 우다다 적고, 버튼 몇 번으로 위클리·데일리 정리</p>
+    </div>
+  </div>
+
+  <div class="btns">
+    <a class="b pri" href="https://github.com/dlsdml99-create/dumpu/releases/latest/download/dumpu.apk">안드로이드 앱 받기 (v{{VERSION}})</a>
+    <a class="b sec" href="app/">아이폰·웹에서 바로 쓰기</a>
+  </div>
+  <p class="meta">v{{VERSION}} · {{DATE}} · 무료 · 광고 없음 · 계정 없음</p>
+
+  <div class="qr">
+    <img src="qr.svg" alt="이 페이지 QR 코드">
+    <p>다른 폰에서는 이 QR을 찍으면 이 페이지가 열려요. 친구에게는 이 주소를 보내면 돼요:<br><code>https://dlsdml99-create.github.io/dumpu/</code></p>
+  </div>
+
+  <h2>소개</h2>
+  <div class="feat">
+    <div><b>먼슬리에 몰아 적기</b><span>한 줄에 하나씩 우다다 적고 [추가] 한 번이면 여러 개가 한꺼번에 들어가요.</span></div>
+    <div><b>주차 버튼으로 위클리</b><span>할 일 밑의 1주차·2주차 버튼을 누르면 그 주 위클리에 정리돼요.</span></div>
+    <div><b>요일 버튼으로 데일리</b><span>위클리에서 월~일을 누르면 그 날 데일리로 내려가요.</span></div>
+    <div><b>언제 했는지 기록</b><span>체크하면 "11/9(월) 완료"처럼 날짜가 남고, 달력에 작게 표시돼요.</span></div>
+    <div><b>밀린 일 한 번에</b><span>못 끝낸 일은 "이번 주로"·"오늘로" 한 번에 옮겨요.</span></div>
+    <div><b>반복·색깔</b><span>매주·매달 할 일은 자동으로 생기고, 회사·집·약속 색으로 구분해요.</span></div>
+    <div><b>홈 화면 위젯</b><span>앱을 안 열고 오늘 할 일을 바로 체크해요. (안드로이드)</span></div>
+    <div><b>아침 알림</b><span>정한 시간에 "오늘 할 일 3개"를 알려줘요. (안드로이드)</span></div>
+  </div>
+
+  <h2>업데이트 내용 <span class="n">최신 v{{VERSION}}</span></h2>
+  <div class="upd"><b>v1.0 · 2026.11.09</b>처음 나왔어요. 먼슬리 우다다 입력, 주차·요일 버튼 정리, 완료 날짜 기록과 달력 표시, 밀린 일 옮기기, 반복 할 일, 색깔, 홈 화면 위젯, 아침 알림.</div>
+
+  <h2>설치 방법</h2>
+  <h3>안드로이드</h3>
+  <ol>
+    <li>위의 <b>안드로이드 앱 받기</b>를 눌러 <code>dumpu.apk</code>를 받아요.</li>
+    <li>받은 파일을 눌러 열어요. "출처를 알 수 없는 앱" 안내가 나오면 <b>설정 → 이 출처 허용</b>을 켜고 돌아와 <b>설치</b>를 눌러요.</li>
+    <li>Play 프로텍트 창이 뜨면 <b>세부정보 더보기 → 무시하고 설치</b>를 눌러요. 플레이 스토어에 올린 앱이 아니라서 나오는 안내예요.</li>
+  </ol>
+  <h3>아이폰</h3>
+  <ol>
+    <li>사파리에서 <b>아이폰·웹에서 바로 쓰기</b>를 열어요.</li>
+    <li>아래 공유 버튼 → <b>홈 화면에 추가</b>를 누르면 앱처럼 쓸 수 있어요.</li>
+    <li>아이폰에서는 위젯과 아침 알림이 안 돼요. 할 일은 그 아이폰 사파리에만 저장돼요.</li>
+  </ol>
+
+  <h2>사용 설명서</h2>
+  <div class="card">
+    <h3>1. 먼슬리: 한 달 할 일 몰아 적기</h3>
+    <p>큰 칸에 한 줄에 하나씩 적고 <b>추가</b>. 할 일마다 밑에 <b>1주차~5주차</b> 버튼이 있어요. 누르면 그 주 위클리로 가고, 한 번 더 누르면 빠져요.</p>
+    <h3>2. 위클리: 이번 주 정리</h3>
+    <p>위의 주차 버튼으로 주를 고르고, 할 일 밑의 <b>월~일</b>을 누르면 그 날 데일리로 내려가요. 체크하면 오늘 날짜로 완료가 기록돼요. 주차를 안 정한 먼슬리 할 일은 아래 <b>이번 주로</b>로 가져와요.</p>
+    <h3>3. 데일리: 오늘 할 일</h3>
+    <p>‹ › 로 날짜를 옮겨요. 위클리에서 날짜를 안 정한 일은 아래 <b>이 날로</b>로 가져와요.</p>
+    <h3>4. 달력</h3>
+    <p>초록 점·글씨는 한 일, 빈 동그라미는 할 일이에요. 날짜를 누르면 그 날 기록이 나오고, 바로 추가도 돼요.</p>
+    <h3>5. 할 일 고치기·반복·색깔</h3>
+    <p>할 일 글자를 누르면 고치기 창이 열려요. 이름 바꾸기, 색깔, <b>매주 ○요일 / 매달 ○일 반복</b>, 내일로 미루기, 지우기를 할 수 있어요.</p>
+    <h3>6. 밀린 일</h3>
+    <p>날짜나 주가 지났는데 못 한 일이 있으면 위에 안내가 떠요. <b>이번 달로 / 이번 주로 / 오늘로</b>를 누르면 한 번에 옮겨져요.</p>
+    <h3>7. 위젯·아침 알림 (안드로이드)</h3>
+    <p>오른쪽 위 ⚙ 설정에서 아침 알림을 켜고 시간을 정해요. 위젯은 홈 화면 빈 곳을 길게 눌러 <b>위젯 → 덤푸</b>를 끌어다 놓아요. 위젯에서 할 일을 누르면 체크돼요.</p>
+    <h3>8. 업데이트</h3>
+    <p>왼쪽 아래 버전 글씨를 누르면 정보 창이 열려요. 새 버전이 나오면 버전 글씨가 <b>노란색</b>으로 바뀌고, <b>업데이트 받기</b>로 받아 설치하면 돼요. 적어 둔 할 일은 그대로 남아요.</p>
+  </div>
+
+  <h2>권한과 안전</h2>
+  <table>
+    <tr><td>인터넷</td><td>새 버전이 나왔는지 GitHub 공개 정보만 읽어요. 내 할 일은 어디에도 보내지 않아요.</td></tr>
+    <tr><td>알림</td><td>아침 알림을 켤 때만 물어봐요.</td></tr>
+    <tr><td>부팅 후 실행</td><td>폰을 다시 켜도 아침 알림이 이어지게 하려고 써요.</td></tr>
+    <tr><td>저장</td><td>할 일은 이 폰 안에만 저장돼요. 계정·서버·광고·사용 기록 전송이 없어요. 앱을 지우면 기록도 같이 지워져요.</td></tr>
+    <tr><td>카메라·위치·연락처</td><td>쓰지 않아요.</td></tr>
+  </table>
+
+  <footer>덤푸 · 소스: <code>github.com/dlsdml99-create/dumpu</code></footer>
+</div>
+</body>
+</html>

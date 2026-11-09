@@ -1,0 +1,69 @@
+plugins {
+    id 'com.android.application'
+}
+
+// 버전은 web/index.html 의 <meta name="app-version"> 한 곳에서만 정한다
+def html = file('../web/index.html').getText('UTF-8')
+def m = html =~ /name="app-version" content="(\d+)\.(\d+)"/
+if (!m.find()) throw new GradleException('web/index.html 에서 app-version 을 찾지 못했어요')
+def vMajor = m.group(1) as int
+def vMinor = m.group(2) as int
+
+android {
+    namespace 'io.github.dlsdml99create.dumpu'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.dlsdml99create.dumpu'
+        minSdk 24
+        targetSdk 35
+        versionCode vMajor * 100 + vMinor
+        versionName "${vMajor}.${vMinor}"
+        resourceConfigurations += ['ko']
+    }
+
+    signingConfigs {
+        release {
+            def ks = System.getenv('KEYSTORE_FILE')
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('KEYSTORE_PASSWORD')
+                keyAlias 'dumpu'
+                keyPassword System.getenv('KEYSTORE_PASSWORD')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+
+    sourceSets {
+        main {
+            assets.srcDirs = ['../web']
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        resources.excludes += ['META-INF/**', 'kotlin/**', 'DebugProbesKt.bin']
+    }
+
+    dependenciesInfo {
+        includeInApk false
+        includeInBundle false
+    }
+}
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
+}
