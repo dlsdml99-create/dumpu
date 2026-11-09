@@ -16,21 +16,35 @@ permissions:
   pages: write
   id-token: write
 
+# 앱 빌드와 같은 줄에 서면, 한 번에 둘 다 올라왔을 때 기다리던 앱 빌드가 취소돼요 → 따로 줄 서기
 concurrency:
-  group: release
+  group: pages-only
   cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.chk.outputs.skip }}
     steps:
       - uses: actions/checkout@v4
-      - run: bash .github/make-site.sh
-      - uses: actions/upload-pages-artifact@v3
+        with:
+          fetch-depth: 0
+      # 앱 파일도 같이 바뀌었으면 '앱 빌드'가 새 버전과 함께 페이지까지 올리니 여기서는 건너뛰기
+      - id: chk
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null | grep -qvE '^(site/|README\.md$|\.github/)'; then
+            echo "skip=1" >> "$GITHUB_OUTPUT"; echo "앱도 바뀌어서 '앱 빌드'가 페이지까지 올려요"
+          fi
+      - if: steps.chk.outputs.skip != '1'
+        run: bash .github/make-site.sh
+      - if: steps.chk.outputs.skip != '1'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: _site
   deploy:
     needs: build
+    if: needs.build.outputs.skip != '1'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
