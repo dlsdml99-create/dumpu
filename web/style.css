@@ -352,3 +352,20 @@ body.painting{-webkit-user-select:none;user-select:none}
 .ht.all .ht-d{font-size:0}
 .ht.all .ht-d b{font-size:9px;padding:0}
 .ht.all .ht-d.tdy b{padding:0 1px}
+/* v2.3: 습관 아이콘, 주 목표, 순서 끌기 */
+.ht-n{display:flex;align-items:center;gap:2px;overflow:hidden}
+.ht-nb{font-size:12px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1;padding:0}
+.hic{margin-right:2px}
+.grip.hg{font-size:15px;padding:2px 1px;flex:none}
+.ht-r.drop-on{outline:2px dashed var(--cobalt);outline-offset:-1px}
+.ht-c.on{font-size:13px}
+.icgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:4px;margin:6px 0}
+.icgrid .ic{height:40px;border:1px solid var(--line);border-radius:10px;font-size:20px;display:grid;place-items:center}
+.icgrid .ic:first-child{font-size:12px;color:var(--muted)}
+.icgrid .ic.on{border:2px solid var(--cobalt);background:var(--soft)}
+.rrow2{display:flex;flex-direction:column;gap:1px}
+.rsub{font-size:11px;color:var(--muted);padding-left:2px}
+.rt.em{font-size:11px}
+.rt-row .rt.em{filter:none}
+.ht-nb{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;line-height:1.15;word-break:break-all}
+@media (max-width:340px){.ht-nb{font-size:11px}.grip.hg{font-size:12px;padding:2px 0}.ht-r{grid-template-columns:minmax(50px,1.1fr) repeat(var(--n),minmax(18px,1fr)) 28px}}

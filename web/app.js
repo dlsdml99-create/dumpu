@@ -80,7 +80,7 @@ function syncNative(){
     const days={};const base=parse(todayS());const t0s=todayS();
     for(let i=0;i<14;i++){const x=new Date(base);x.setDate(base.getDate()+i);const s=ymd(x);
       days[s]=real.tasks.filter(t=>t.day===s).sort(byTime).slice(0,30).map(t=>({id:t.id,text:((t.time?t.time+' ':'')+t.text).slice(0,60),done:!!t.done}))}
-    days[t0s]=(days[t0s]||[]).concat(real.habits.filter(x=>habitOn(x,t0s)).map(x=>({id:'h:'+x.id,text:x.name.slice(0,20),done:((real.hchk||{})[t0s]||[]).includes(x.id),r:true})));
+    days[t0s]=(days[t0s]||[]).concat(real.habits.filter(x=>habitOn(x,t0s)).map(x=>({id:'h:'+x.id,text:(x.icon?x.icon+' ':'')+x.name.slice(0,20),done:((real.hchk||{})[t0s]||[]).includes(x.id),r:true})));
     const t0=todayS(),L=real.logs[t0]||{},filled=[];
     for(let hh=0;hh<24;hh++){let n=0;for(let k=0;k<6;k++)if(L[hh*6+k])n++;if(n>=3)filled.push(hh)} // 반 이상 적은 시간은 안 물어봄
     const S=real.settings;
@@ -366,7 +366,7 @@ function monthImage(){
   const diaries=days.filter(d=>D.diary&&D.diary[d]).slice(-8);
   const catKeys=Object.keys(St.cats).sort((a,b)=>St.cats[b]-St.cats[a]).slice(0,6);
   const W=1080,F='system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif';
-    const Ht=300+(H.length?120+H.length*(78)+40:0)+(mt.length?150:0)+(St.total?140+catKeys.length*56:0)+(diaries.length?110+diaries.length*92:0)+90;
+    const Ht=300+(H.length?120+H.length*(96)+40:0)+(mt.length?150:0)+(St.total?140+catKeys.length*56:0)+(diaries.length?110+diaries.length*92:0)+90;
   const c=document.createElement('canvas');c.width=W;c.height=Ht;const g=c.getContext('2d');
   const C={bg:cssVar('--paper'),card:cssVar('--card'),ink:cssVar('--ink'),mu:cssVar('--muted'),line:cssVar('--line'),acc:cssVar('--cobalt')};
   const col=t=>okTag(t)?cssVar('--t'+colOf(t)):C.mu;
@@ -377,10 +377,13 @@ function monthImage(){
   const secT=t=>{g.fillStyle=C.mu;g.font='700 30px '+F;g.fillText(t,60,y);y+=50};
   const bar=(x,yy,w,pc,color)=>{g.fillStyle=C.line;g.fillRect(x,yy,w,18);g.fillStyle=color;g.fillRect(x,yy,Math.max(0,w*pc/100),18)};
   if(H.length){secT('습관 달성률');
+    const pm=prevMonthDays();
     for(const hb of H){const r=habitRate(hb,upto),sk=habitStreak(hb,t0>days[last-1]?days[last-1]:t0);
-      g.fillStyle=col(hb.tag);g.font='800 34px '+F;g.fillText('♥ '+hb.name.slice(0,10),60,y+30);
+      const pr=pm.some(d=>habitDone(hb,d))?habitRate(hb,pm).pc:null;
+      g.fillStyle=col(hb.tag);g.font='800 34px '+F;g.fillText(hbMark(hb)+' '+hb.name.slice(0,9),60,y+30);
+      if(pr!=null){const dd=r.pc-pr;g.font='600 24px '+F;g.fillStyle=dd>=0?cssVar('--t3'):cssVar('--t0');g.fillText('지난달 '+pr+'% → '+(dd>=0?'+':'')+dd+'%',440,y+62)}
       bar(440,y+10,380,r.pc,col(hb.tag));
-      g.fillStyle=C.ink;g.font='700 30px '+F;g.textAlign='right';g.fillText(r.n+'/'+r.of+'  '+r.pc+'%'+(sk>=2?'  🔥'+sk:''),W-60,y+32);g.textAlign='left';y+=78}
+      g.fillStyle=C.ink;g.font='700 30px '+F;g.textAlign='right';g.fillText(r.pc+'%'+(sk>=2?'  🔥'+sk+(hb.goal?'주':''):''),W-60,y+32);g.textAlign='left';y+=96}
     y+=20}
   if(mt.length){secT('이번 달 할 일');const dn=mt.filter(t=>t.done).length,pc=Math.round(dn/mt.length*100);
     g.fillStyle=C.ink;g.font='800 40px '+F;g.fillText(dn+' / '+mt.length+'개 끝냈어요',60,y+30);bar(560,y+12,W-620,pc,C.acc);y+=100}
@@ -477,7 +480,7 @@ function calGrid(){
     grid.append(h('button',{type:'button',class:(out?'out ':'')+(d===t0?'today ':'')+(d===st.sel&&!st.pick?'sel ':'')+(red?'red ':dowOf(d)===5?'blue ':''),
       'data-d':d,'data-drop':'day:'+d,'aria-label':md(d)+(labs.length?' '+labs.map(l=>l.t).join(' '):'')+' 할 일 '+dots.filter(t=>!t.done).length+'개, 한 일 '+dots.filter(t=>t.done).length+'개'+(hd.length?', 습관 '+hd.length+'개':''),on:{click:()=>calTap(d)}},
       h('span',{class:'dl'},h('span',{class:'d',text:String(dt.getDate())}),labs.length?h('span',{class:'lab '+labs[0].c,text:labs[0].t}):null),
-      hd.length?h('span',{class:'rt-row'},hd.slice(0,5).map(x=>h('i',{class:'rt on tc'+(okTag(x.tag)?colOf(x.tag):'n'),text:'♥'}))):null,
+      hd.length?h('span',{class:'rt-row'},hd.slice(0,5).map(x=>h('i',{class:'rt on tc'+(okTag(x.tag)?colOf(x.tag):'n')+(x.icon?' em':''),text:hbMark(x)}))):null,
       dots.length?h('span',{class:'mk'},dots.slice(0,6).map(t=>h('i',{class:(t.done?'':'p ')+(hasTag(t)?'c'+colOf(t.tag):'cn')}))):null))});
   return grid;
 }
@@ -685,21 +688,49 @@ function vDaily(){
 }
 
 // ── 습관: 헬스·영어공부처럼 매일 체크하는 것 (반복 일정과 따로)
+// 습관 아이콘 (종류별)
+const ICON_SETS=[
+ ['운동','💪🏋️🏃🚶🧘🚴🏊⚽🏀🎾🏸⛳🥊🤸🧗⛹️🏓🛹⛷️🩰'],
+ ['공부·일','📚📖✏️📝💻🎓🧠🔤🌏🗣️📊💼🧮🔬🎹🎸🎨📷✍️🗂️'],
+ ['건강·몸','💧🥗🍎🥦💊🦷😴🛌🧴🚭🍵🥛⚖️🫁❤️🩺🧼🌞🥤🍳'],
+ ['마음·생활','🙏📿🧘‍♀️😊📔🌱🪴🧹🧺🛒💰🐶🐱👶🏠🚗📞💌🎁🕯️'],
+ ['취미','🎮🎬🎧🎤🧶🧩♟️🎲🍰☕🍷🌸🌙⭐🔥🎯🏆✈️🗓️✅']
+];
+const iconsOf=t=>{try{return [...new Intl.Segmenter('ko',{granularity:'grapheme'}).segment(t)].map(x=>x.segment)}catch(e){return (t.match(/(\p{Extended_Pictographic}\uFE0F?(\u200D\p{Extended_Pictographic}\uFE0F?)*|\p{Emoji_Presentation})/gu)||[])}};
+const hbMark=hb=>hb.icon||'♥';
 function habitDone(hb,d){return ((data().hchk||{})[d]||[]).includes(hb.id)}
 // 습관 요일: 없으면 매일. 정한 요일만 칸·달성률에 셈
-const habitOn=(hb,d)=>!Array.isArray(hb.dows)||!hb.dows.length||hb.dows.includes(dowOf(d));
-const habitDays=hb=>!Array.isArray(hb.dows)||!hb.dows.length||hb.dows.length===7?'매일':hb.dows.length===5&&[...hb.dows].sort().join()==='0,1,2,3,4'?'평일':[...hb.dows].sort().map(i=>DOW[i]).join('·');
+const habitOn=(hb,d)=>!!hb.goal||!Array.isArray(hb.dows)||!hb.dows.length||hb.dows.includes(dowOf(d));
+const habitDays=hb=>hb.goal?'주 '+hb.goal+'번':!Array.isArray(hb.dows)||!hb.dows.length||hb.dows.length===7?'매일':hb.dows.length===5&&[...hb.dows].sort().join()==='0,1,2,3,4'?'평일':[...hb.dows].sort().map(i=>DOW[i]).join('·');
 function toggleHabit(hb,d){
   const D=data();D.hchk=D.hchk||{};const a=D.hchk[d]||[];
   if(a.includes(hb.id))D.hchk[d]=a.filter(x=>x!==hb.id);else D.hchk[d]=[...a,hb.id];
   if(!D.hchk[d].length)delete D.hchk[d];save();render();
 }
-function habitStreak(hb,t0){ // 오늘까지 이어서 한 날 (쉬는 요일은 건너뜀)
+function habitStreak(hb,t0){ // 오늘까지 이어서 한 날 (쉬는 요일은 건너뜀). 주 N번이면 이어서 채운 주
+  if(hb.goal){let n=0;const x=parse(t0);x.setDate(x.getDate()-dowOf(t0));
+    if(weekCount(hb,t0)>=hb.goal)n++;
+    for(let i=0;i<60;i++){x.setDate(x.getDate()-7);if(weekCount(hb,ymd(x))>=hb.goal)n++;else break}
+    return n}
   let n=0;const x=parse(t0);
   for(let i=0;i<400;i++,x.setDate(x.getDate()-1)){const d=ymd(x);if(!habitOn(hb,d))continue;if(habitDone(hb,d))n++;else if(d!==t0)break}
   return n;
 }
-function habitRate(hb,days){const on=days.filter(d=>habitOn(hb,d));const n=on.filter(d=>habitDone(hb,d)).length;return {n,of:on.length,pc:on.length?Math.round(n/on.length*100):0}}
+// 주 N번 목표가 있으면 주마다 N번 채웠는지로 셈 (월~일)
+function weeksIn(days){const m={};for(const d of days){const x=parse(d);x.setDate(x.getDate()-dowOf(d));(m[ymd(x)]=m[ymd(x)]||[]).push(d)}return m}
+function weekCount(hb,d){const x=parse(d);x.setDate(x.getDate()-dowOf(d));let n=0;for(let i=0;i<7;i++){if(habitDone(hb,ymd(x)))n++;x.setDate(x.getDate()+1)}return n}
+function habitRate(hb,days){
+  if(hb.goal){const W=weeksIn(days);let got=0,of=0,n=0;
+    const t0=todayS();
+    for(const k in W){const ds=W[k],c=ds.filter(d=>habitDone(hb,d)).length;n+=c;
+      // 달의 처음·끝에 걸친 짧은 주는 날 수만큼만, 지금 주는 아직 진행 중이라 깎지 않음
+      let t=ds.length>=7?hb.goal:Math.round(hb.goal*ds.length/7);
+      if(ds.includes(t0))t=Math.min(hb.goal,Math.max(c,t));
+      if(!t)continue;got+=Math.min(c,t);of+=t}
+    return {n,of,pc:of?Math.round(got/of*100):0,goal:true}}
+  const on=days.filter(d=>habitOn(hb,d));const n=on.filter(d=>habitDone(hb,d)).length;return {n,of:on.length,pc:on.length?Math.round(n/on.length*100):0}}
+function prevMonthDays(){const y=st.m===0?st.y-1:st.y,m=st.m===0?11:st.m-1;const n=new Date(y,m+1,0).getDate();const a=[];for(let i=1;i<=n;i++)a.push(y+'-'+pad(m+1)+'-'+pad(i));return a}
+function diffTxt(now,prev){if(prev==null)return '';const d=now-prev;return d===0?' · 지난달과 같아요':' · 지난달보다 '+(d>0?'+':'')+d+'%'}
 function vHabit(){
   const D=data(),H=D.habits,t0=todayS();
   const last=new Date(st.y,st.m+1,0).getDate();
@@ -714,23 +745,25 @@ function vHabit(){
   function go(){const v=inp.value.trim().slice(0,20);if(!v){toast('습관 이름을 적어 주세요');return}
     const hb={id:uid(),name:v,tag:st.addTag,dows:null};D.habits.push(hb);inp.value='';save();render();toast(v+' 습관을 넣었어요 · 이름을 누르면 요일을 정해요')}
   const cell=(hb,d,cls)=>{const on=habitDone(hb,d),sch=habitOn(hb,d);
-    return h('button',{type:'button',class:'ht-c'+(on?' on c'+cls:'')+(d>t0?' fut':'')+(sch?'':' off')+(d===t0?' now':''),'aria-label':md(d)+' '+hb.name+(on?' 했어요':sch?' 안 했어요':' 쉬는 날'),'aria-pressed':on?'true':'false',text:on?(all?'':'✓'):(sch||all?'':'·'),on:{click:()=>toggleHabit(hb,d)}})};
+    return h('button',{type:'button',class:'ht-c'+(on?' on c'+cls:'')+(d>t0?' fut':'')+(sch?'':' off')+(d===t0?' now':''),'aria-label':md(d)+' '+hb.name+(on?' 했어요':sch?' 안 했어요':' 쉬는 날'),'aria-pressed':on?'true':'false',text:on?(all?'':(hb.icon||'✓')):(sch||all?'':'·'),on:{click:()=>toggleHabit(hb,d)}})};
   const tbl=h('div',{class:'ht'+(all?' all':''),style:'--n:'+days.length},
     h('div',{class:'ht-r ht-head'},h('span',{class:'ht-n'}),days.map(d=>{const n=+d.slice(8);return h('span',{class:'ht-d'+(d===t0?' tdy':'')+(dowOf(d)===6||holOf(d)?' red':dowOf(d)===5?' blue':'')},all?(n===1||n%5===0?h('b',{text:String(n)}):h('b',{text:'\u00a0'})):[h('b',{text:String(n)}),DOW[dowOf(d)]])}),h('span',{class:'ht-s',text:'이번 달'})),
-    H.map(hb=>{const cls=okTag(hb.tag)?colOf(hb.tag):'n';const r=habitRate(hb,upto);
-      return h('div',{class:'ht-r'},
-        h('button',{type:'button',class:'ht-n tc'+cls,text:hb.name,title:habitDays(hb),on:{click:()=>habitSheet(hb)}}),
+    H.map((hb,hi)=>{const cls=okTag(hb.tag)?colOf(hb.tag):'n';const r=habitRate(hb,upto);
+      return h('div',{class:'ht-r','data-hab':hi},
+        h('span',{class:'ht-n'},h('span',{class:'grip hg','aria-hidden':'true',text:'≡'}),h('button',{type:'button',class:'ht-nb tc'+cls,title:hb.name+' · '+habitDays(hb),on:{click:()=>habitSheet(hb)}},hb.icon?h('span',{class:'hic',text:hb.icon}):null,hb.name)),
         days.map(d=>cell(hb,d,cls)),
-        h('span',{class:'ht-s',text:r.n+'/'+r.of}))}));
+        h('span',{class:'ht-s',text:hb.goal?'주 '+weekCount(hb,t0)+'/'+hb.goal:r.n+'/'+r.of}))}));
   const reps=D.reps;
   return [head('습관',H.length?'습관 '+H.length+'개':'매일 체크'),
     h('div',{class:'add'},inp,h('button',{class:'go',type:'button',text:'추가',on:{click:go}})),tagPicker(),
     h('div',{class:'weeks'},pages.map(([a,b],i)=>h('button',{type:'button',class:'chip'+(!all&&i===st.hpage?' on':''),text:a+'~'+b+'일',on:{click:()=>{st.hview=null;st.hpage=i;render()}}})),
       h('button',{type:'button',class:'chip'+(all?' on':''),text:'한 달 한눈에',on:{click:()=>{st.hview=all?null:'month';render()}}})),
     H.length?tbl:h('div',{class:'empty'},h('div',{text:'아직 습관이 없어요. 위에 "헬스장"처럼 적어서 넣어요.'})),
-    H.length?h('p',{class:'hint',text:'습관 이름을 누르면 요일(헬스 월·수·금 등)·이름·색을 정해요. 쉬는 요일은 흐리게 보이고 달성률에서 빠져요. 옆으로 밀면 다음 달.'}):null,
+    H.length?h('p',{class:'hint',text:'습관 이름을 누르면 아이콘·요일·주 몇 번 목표·색을 정해요. ≡ 를 끌면 순서가 바뀌어요. 옆으로 밀면 다음 달.'}):null,
     H.length&&upto.length?h('div',{class:'rbox'},h('b',{text:(st.m+1)+'월 달성률'}),H.map(hb=>{const r=habitRate(hb,upto),cls=okTag(hb.tag)?colOf(hb.tag):'n',streak=habitStreak(hb,t0);
-      return h('div',{class:'rrow'},h('span',{class:'rn tc'+cls,text:hb.name.slice(0,10)}),h('span',{class:'rbar'},h('i',{class:'c'+cls,style:'width:'+r.pc+'%'})),h('span',{class:'rp',text:r.n+'/'+r.of+' · '+r.pc+'%'+(streak>=2?' · 🔥'+streak:'')}))})):null,
+      const pm=prevMonthDays(),pr=pm.some(d=>habitDone(hb,d))?habitRate(hb,pm).pc:null;
+      return h('div',{class:'rrow2'},h('div',{class:'rrow'},h('span',{class:'rn tc'+cls,text:(hb.icon?hb.icon+' ':'')+hb.name.slice(0,10)}),h('span',{class:'rbar'},h('i',{class:'c'+cls,style:'width:'+r.pc+'%'})),h('span',{class:'rp',text:r.pc+'%'+(streak>=2?' 🔥'+streak+(hb.goal?'주':''):'')})),
+        h('small',{class:'rsub',text:(hb.goal?'주 '+hb.goal+'번 목표 · ':habitDays(hb)+' · ')+r.n+'번 했어요'+diffTxt(r.pc,pr)}))})):null,
     H.length?h('button',{type:'button',class:'btn',style:'margin:8px 0',text:'🖼 이번 달 돌아보기 이미지',on:{click:()=>monthImage()}}):null,
     reps.length?[h('div',{class:'sec',text:'반복 일정 중 습관으로 옮기기'}),h('p',{class:'hint',text:'예전에 반복으로 넣은 것 중 습관(헬스·공부 등)만 옮기면 달력에서 빠지고 여기서 체크해요. 학원·청소 같은 일정은 그대로 두세요.'}),
       h('div',{class:'list'},reps.map(r=>h('div',{class:'row'},h('div',{class:'top'},h('span',{class:'txt',text:r.text+' · '+repLabel(r)}),h('button',{type:'button',class:'chip on',text:'습관으로',on:{click:()=>repToHabit(r)}})))))]:null];
@@ -744,6 +777,19 @@ function repToHabit(r){
 function habitSheet(hb){
   const ni=h('input',{id:'hName',maxlength:'20'});ni.value=hb.name;let tag=hb.tag;
   let dows=new Set(Array.isArray(hb.dows)&&hb.dows.length?hb.dows:[0,1,2,3,4,5,6]);
+  let icon=hb.icon||null,goal=hb.goal||null,iset=0;
+  const iRow=h('div');
+  const drawI=()=>iRow.replaceChildren(
+    h('div',{class:'chips',style:'padding-left:0'},ICON_SETS.map(([n],i)=>h('button',{type:'button',class:'chip'+(i===iset?' on':''),text:n,on:{click:()=>{iset=i;drawI()}}}))),
+    h('div',{class:'icgrid'},h('button',{type:'button',class:'ic'+(icon==null?' on':''),text:'없음',on:{click:()=>{icon=null;drawI()}}}),
+      iconsOf(ICON_SETS[iset][1]).map(x=>h('button',{type:'button',class:'ic'+(icon===x?' on':''),text:x,'aria-label':'아이콘 '+x,on:{click:()=>{icon=x;drawI()}}}))));
+  drawI();
+  const gRow=h('div');
+  const drawG=()=>gRow.replaceChildren(h('div',{class:'chips',style:'padding-left:0'},
+    h('button',{type:'button',class:'chip'+(!goal?' on':''),text:'정한 요일마다',on:{click:()=>{goal=null;drawG()}}}),
+    [1,2,3,4,5,6].map(n=>h('button',{type:'button',class:'chip'+(goal===n?' on':''),text:'주 '+n+'번',on:{click:()=>{goal=n;drawG()}}}))),
+    h('p',{text:goal?'요일 상관없이 한 주(월~일)에 '+goal+'번 하면 성공이에요.':'아래 요일마다 하면 성공이에요.'}));
+  drawG();
   const dRow=h('div');
   const drawD=()=>dRow.replaceChildren(h('div',{class:'chips dows'},DOW.map((x,i)=>h('button',{type:'button',class:'chip'+(dows.has(i)?' on':''),text:x,'aria-pressed':dows.has(i)?'true':'false',on:{click:()=>{dows.has(i)?dows.delete(i):dows.add(i);drawD()}}}))),
     h('div',{class:'chips',style:'padding-left:0'},[['매일',[0,1,2,3,4,5,6]],['평일',[0,1,2,3,4]],['주말',[5,6]],['월·수·금',[0,2,4]],['화·목',[1,3]]].map(([l,v])=>h('button',{type:'button',class:'chip',text:l,on:{click:()=>{dows=new Set(v);drawD()}}}))));
@@ -752,9 +798,9 @@ function habitSheet(hb){
   const drawT=()=>tagRow.replaceChildren(...[null,...tagIdx()].map(i=>h('button',{type:'button',class:'chip'+(tag===i?' on':''),on:{click:()=>{tag=i;drawT()}}},i==null?'없음':[h('i',{class:'c'+colOf(i)}),tagName(i)])));
   drawT();
   const D=data();
-  const close=sheet(h('h3',{text:'습관 고치기'}),ni,h('div',{class:'sec',text:'하는 요일'}),dRow,h('div',{class:'sec',text:'색 (카테고리)'}),tagRow,
+  const close=sheet(h('h3',{text:'습관 고치기'}),ni,h('div',{class:'sec',text:'아이콘'}),iRow,h('div',{class:'sec',text:'목표'}),gRow,h('div',{class:'sec',text:'하는 요일 (요일마다일 때)'}),dRow,h('div',{class:'sec',text:'색 (카테고리)'}),tagRow,
     h('button',{class:'btn pri',type:'button',text:'저장',on:{click:()=>{const v=ni.value.trim().slice(0,20);if(!v){toast('이름을 적어 주세요');return}if(!dows.size){toast('요일을 하나 이상 골라 주세요');return}
-      hb.name=v;hb.tag=tag;hb.dows=dows.size===7?null:[...dows].sort();save();close();render();toast(v+' · '+habitDays(hb))}}}),
+      hb.name=v;hb.tag=tag;hb.icon=icon;hb.goal=goal;hb.dows=dows.size===7?null:[...dows].sort();save();close();render();toast((icon?icon+' ':'')+v+' · '+habitDays(hb))}}}),
     h('button',{class:'btn del',type:'button',text:'이 습관 지우기 (체크 기록도 지워져요)',on:{click:()=>{D.habits=D.habits.filter(x=>x!==hb);for(const d in D.hchk){D.hchk[d]=D.hchk[d].filter(x=>x!==hb.id);if(!D.hchk[d].length)delete D.hchk[d]}save();close();render();toast('지웠어요')}}}));
 }
 
@@ -922,7 +968,7 @@ function settingsSheet(){
     Array.from({length:24},(_,i)=>{const o=h('option',{value:String(i),text:i+'시'});if(i===v)o.selected=true;return o}));return x};
   const draw=()=>{
     const w=h('div',{class:'widget'},h('div',{class:'wh'},h('span',{text:'덤푸 · 오늘 '+md(t0)}),h('span',{text:today.length?today.filter(t=>t.done).length+'/'+today.length:''})),
-      D.habits.some(x=>habitOn(x,t0))?h('div',{class:'wr',style:'color:var(--t6);font-weight:700;flex-wrap:wrap'},D.habits.filter(x=>habitOn(x,t0)).map(x=>h('button',{type:'button',style:'color:inherit;font-weight:700;margin-right:10px',text:(habitDone(x,t0)?'♥ ':'♡ ')+x.name,on:{click:()=>{toggleHabit(x,t0);settingsSheet()}}}))):null,
+      D.habits.some(x=>habitOn(x,t0))?h('div',{class:'wr',style:'color:var(--t6);font-weight:700;flex-wrap:wrap'},D.habits.filter(x=>habitOn(x,t0)).map(x=>h('button',{type:'button',style:'color:inherit;font-weight:700;margin-right:10px',text:(habitDone(x,t0)?'♥ ':'♡ ')+(x.icon?x.icon+' ':'')+x.name,on:{click:()=>{toggleHabit(x,t0);settingsSheet()}}}))):null,
       today.length?today.slice(0,4).map(t=>h('div',{class:'wr'},h('button',{class:'ck'+(t.done?' on':''),type:'button','aria-label':'완료',on:{click:()=>{t.done=!t.done;t.doneAt=t.done?t0:null;save();render();settingsSheet()}}},t.done?'✓':''),h('span',{text:(t.time?t.time+' ':'')+t.text,style:t.done?'text-decoration:line-through;color:var(--muted)':''}))):h('div',{class:'wr',style:'color:var(--muted)',text:'오늘 할 일이 없어요'}));
     const sw=h('button',{type:'button',class:'sw'+(S.alarm?' on':''),'aria-label':'아침 알림',on:{click:()=>{S.alarm=!S.alarm;if(S.alarm&&B&&!demo)B.requestNoti();save();draw()}}});
     const hsw=h('button',{type:'button',class:'sw'+(S.hol?' on':''),'aria-label':'공휴일 표시',on:{click:()=>{S.hol=!S.hol;save();render();draw()}}});
@@ -978,6 +1024,8 @@ function dragPoint(e){const p=e.touches&&e.touches[0]||e.changedTouches&&e.chang
 function dragStart(e){
   if(e.button>0)return;
   const grip=e.target.closest('.grip');
+  if(grip&&grip.closest('.ht-r[data-hab]')){const row=grip.closest('.ht-r[data-hab]');const pt=dragPoint(e);
+    Object.assign(DR,{kind:'hab',cat:+row.dataset.hab,x0:pt.x,y0:pt.y,moved:false});beginDrag(pt,(data().habits[+row.dataset.hab]||{name:''}).name);if(e.type==='mousedown')e.preventDefault();return}
   if(grip){const row=grip.closest('.catrow');if(!row)return;
     const pt=dragPoint(e);Object.assign(DR,{kind:'cat',cat:+row.dataset.cat,x0:pt.x,y0:pt.y,moved:false});beginDrag(pt,row.querySelector('input').value);if(e.type==='mousedown')e.preventDefault();return}
   const el=e.target.closest('[data-tid]');
@@ -1007,6 +1055,7 @@ function dragMove(e){
   const hit=document.elementFromPoint(pt.x,pt.y);
   let tgt=null;
   if(DR.kind==='cat')tgt=hit&&hit.closest('.catrow');
+  else if(DR.kind==='hab')tgt=hit&&hit.closest('.ht-r[data-hab]');
   else{tgt=hit&&hit.closest('[data-drop]');if(tgt&&tgt.dataset.drop==='before:'+DR.id)tgt=null}
   if(DR.over!==tgt){if(DR.over)DR.over.classList.remove('drop-on');DR.over=tgt;if(tgt)tgt.classList.add('drop-on')}
   // 화면 끝으로 끌면 스크롤
@@ -1024,6 +1073,8 @@ function dragEnd(e){
   document.querySelectorAll('.dragging').forEach(x=>x.classList.remove('dragging'));
   document.body.classList.remove('is-dragging');
   DR.on=false;DR.kind=null;DR.until=Date.now()+450; // 손 뗀 뒤 눌림(줄 긋기)으로 처리되지 않게
+  if(kind==='hab'){if(over&&+over.dataset.hab!==DR.cat){const pt=dragPoint(e);const r=over.getBoundingClientRect();const H=data().habits;const it=H.splice(DR.cat,1)[0];
+    let to=+over.dataset.hab;if(to>DR.cat)to--;if(pt.y>r.top+r.height/2)to++;H.splice(to,0,it);save();render();toast('습관 순서를 바꿨어요')}return}
   if(kind==='cat'){if(over&&+over.dataset.cat!==DR.cat){const pt=dragPoint(e);const r=over.getBoundingClientRect();moveTag(DR.cat,+over.dataset.cat,pt.y>r.top+r.height/2)}return}
   const t=data().tasks.find(x=>x.id===DR.id);if(!t)return;
   if(!moved||!over){const pp=document.querySelector('.pop');if(pp)pp.style.visibility='';if(!moved){closePop();editSheet(t)}return}
@@ -1267,7 +1318,8 @@ function importData(o){
   for(const day in out.logs){const o=out.logs[day];for(const k in o)if(o[k].startsWith('e:')&&!out.ents[o[k].slice(2)])delete o[k];if(!Object.keys(o).length)delete out.logs[day]}
   for(const x of (Array.isArray(d.habits)?d.habits:[]).slice(0,100)){if(!x||!okId(x.id))continue;const name=cleanStr(x.name,20).trim();if(!name)continue;
     const dw=Array.isArray(x.dows)?[...new Set(x.dows.filter(v=>Number.isInteger(v)&&v>=0&&v<7))].sort():[];
-    out.habits.push({id:x.id,name,tag:Number.isInteger(x.tag)&&x.tag>=0&&x.tag<8?x.tag:null,dows:dw.length&&dw.length<7?dw:null})}
+    const okIcon=typeof x.icon==='string'&&ICON_SETS.some(([,v])=>iconsOf(v).includes(x.icon));
+    out.habits.push({id:x.id,name,tag:Number.isInteger(x.tag)&&x.tag>=0&&x.tag<8?x.tag:null,dows:dw.length&&dw.length<7?dw:null,icon:okIcon?x.icon:null,goal:Number.isInteger(x.goal)&&x.goal>=1&&x.goal<=7?x.goal:null})}
   if(d.hchk&&typeof d.hchk==='object'&&!Array.isArray(d.hchk)){const ids=new Set(out.habits.map(x=>x.id));let n=0;
     for(const k in d.hchk){if(!isDate(k)||++n>20000||!Array.isArray(d.hchk[k]))continue;const a=[...new Set(d.hchk[k].filter(v=>ids.has(v)))];if(a.length)out.hchk[k]=a}}
   const S=d.settings||{};
