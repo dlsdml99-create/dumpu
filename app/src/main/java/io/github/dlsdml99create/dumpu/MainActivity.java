@@ -23,7 +23,7 @@ public class MainActivity extends Activity {
     static final String START = "https://" + HOST + "/assets/index.html";
 
     private WebView web;
-    private boolean openDaily = false;
+    private String openTo = null; // 알림을 눌러 열 화면 (daily / habit)
     private WebViewAssetLoader loader;
 
     @Override
@@ -88,7 +88,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        openDaily = "daily".equals(getIntent().getStringExtra("open"));
+        openTo = safeOpen(getIntent().getStringExtra("open"));
         if (saved != null) web.restoreState(saved);
         else web.loadUrl(START);
     }
@@ -110,13 +110,17 @@ public class MainActivity extends Activity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
-        if ("daily".equals(intent.getStringExtra("open"))) { openDaily = true; runOpenDaily(); }
+        String o = safeOpen(intent.getStringExtra("open"));
+        if (o != null) { openTo = o; runOpenDaily(); }
     }
 
+    private static String safeOpen(String v) { return "daily".equals(v) || "habit".equals(v) ? v : null; }
+
     private void runOpenDaily() {
-        if (!openDaily || web == null) return;
-        web.evaluateJavascript("(window.__openDaily&&(window.__openDaily(),true))?'1':'0'", v -> {
-            if ("\"1\"".equals(v)) openDaily = false;
+        if (openTo == null || web == null) return;
+        String fn = "habit".equals(openTo) ? "__openHabit" : "__openDaily";
+        web.evaluateJavascript("(window." + fn + "&&(window." + fn + "(),true))?'1':'0'", v -> {
+            if ("\"1\"".equals(v)) openTo = null;
         });
     }
 

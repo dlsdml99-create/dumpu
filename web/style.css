@@ -369,3 +369,13 @@ body.painting{-webkit-user-select:none;user-select:none}
 .rt-row .rt.em{filter:none}
 .ht-nb{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;white-space:normal;line-height:1.15;word-break:break-all}
 @media (max-width:340px){.ht-nb{font-size:11px}.grip.hg{font-size:12px;padding:2px 0}.ht-r{grid-template-columns:minmax(50px,1.1fr) repeat(var(--n),minmax(18px,1fr)) 28px}}
+/* v2.4: 습관 메모·쉬는 기간·보관·알림 */
+.ht-c{position:relative}
+.ht-c.memo::after{content:"";position:absolute;right:1px;top:1px;width:6px;height:6px;border-radius:50%;background:var(--lemon);box-shadow:0 0 0 1px var(--card)}
+.ht-c.pz{border-style:dotted;opacity:.6;font-size:10px;color:var(--muted)}
+.htm{font-size:10px;color:var(--muted);font-weight:500}
+.mlist{border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:8px 0;display:flex;flex-direction:column;gap:2px;font-size:13px}
+.mrow{display:grid;grid-template-columns:auto auto 1fr;gap:8px;align-items:center;text-align:left;padding:3px 0;min-width:0}
+.mrow .md{font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.mrow .mt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.sheet input[type=time]{border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:8px;padding:4px 6px;font:inherit}

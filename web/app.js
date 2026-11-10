@@ -13,7 +13,7 @@ const mkOf=s=>s.slice(0,7);
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const isDate=s=>{if(typeof s!=='string'||!/^\d{4}-\d\d-\d\d$/.test(s))return false;const d=parse(s);return ymd(d)===s&&d.getFullYear()>=2000&&d.getFullYear()<=2100};
 const isTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
-const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},diary:{},habits:[],hchk:{},settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
+const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},diary:{},habits:[],hchk:{},hnote:{},settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
 
 // ── 공휴일 (한국천문연구원 월력요항·정부 발표 기준, 2026~2028)
 const HOL={
@@ -64,6 +64,7 @@ if(!real.ents||typeof real.ents!=='object'||Array.isArray(real.ents))real.ents={
 if(!real.diary||typeof real.diary!=='object'||Array.isArray(real.diary))real.diary={};
 if(!Array.isArray(real.habits))real.habits=[];
 if(!real.hchk||typeof real.hchk!=='object'||Array.isArray(real.hchk))real.hchk={};
+if(!real.hnote||typeof real.hnote!=='object'||Array.isArray(real.hnote))real.hnote={};
 {const S=real.settings;if(!Array.isArray(S.tags)||!S.tags.length)S.tags=['회사','집','약속'];S.tags=S.tags.slice(0,8);
  if(!Array.isArray(S.tagColor))S.tagColor=[];S.tags.forEach((_,i)=>{if(!(S.tagColor[i]>=0&&S.tagColor[i]<8))S.tagColor[i]=i%8});S.tagColor.length=S.tags.length
  if(S.palV!==2){const MAP=[4,3,1,6,5,2,3,7];S.tagColor=S.tagColor.map(o=>MAP[o]);S.palV=2} // 예전 색(파랑·청록·주황·분홍·보라·노랑·초록·회색) → 가장 비슷한 새 색
@@ -80,11 +81,12 @@ function syncNative(){
     const days={};const base=parse(todayS());const t0s=todayS();
     for(let i=0;i<14;i++){const x=new Date(base);x.setDate(base.getDate()+i);const s=ymd(x);
       days[s]=real.tasks.filter(t=>t.day===s).sort(byTime).slice(0,30).map(t=>({id:t.id,text:((t.time?t.time+' ':'')+t.text).slice(0,60),done:!!t.done}))}
-    days[t0s]=(days[t0s]||[]).concat(real.habits.filter(x=>habitOn(x,t0s)).map(x=>({id:'h:'+x.id,text:(x.icon?x.icon+' ':'')+x.name.slice(0,20),done:((real.hchk||{})[t0s]||[]).includes(x.id),r:true})));
+    days[t0s]=(days[t0s]||[]).concat(real.habits.filter(x=>!x.arch&&habitOn(x,t0s)).map(x=>({id:'h:'+x.id,text:(x.icon?x.icon+' ':'')+x.name.slice(0,20),done:((real.hchk||{})[t0s]||[]).includes(x.id),r:true})));
     const t0=todayS(),L=real.logs[t0]||{},filled=[];
     for(let hh=0;hh<24;hh++){let n=0;for(let k=0;k<6;k++)if(L[hh*6+k])n++;if(n>=3)filled.push(hh)} // 반 이상 적은 시간은 안 물어봄
     const S=real.settings;
-    B.sync(JSON.stringify({days,alarm:!!S.alarm,time:S.time,hourly:!!S.hourly,hFrom:S.hFrom|0,hTo:S.hTo|0,filledDay:t0,filled}));
+    const hab=real.habits.filter(x=>!x.arch&&x.time).map(x=>({id:x.id,text:(x.icon?x.icon+' ':'')+x.name.slice(0,20),time:x.time,dows:x.goal?[]:(x.dows||[]),pauses:x.pauses||[],met:!!x.goal&&weekCount(x,t0s)>=x.goal}));
+    B.sync(JSON.stringify({days,alarm:!!S.alarm,time:S.time,hourly:!!S.hourly,hFrom:S.hFrom|0,hTo:S.hTo|0,filledDay:t0,filled,hab}));
   }catch(e){}
 }
 // 위젯에서 체크한 것을 앱 데이터에 반영
@@ -360,7 +362,7 @@ function monthImage(){
   const D=data(),t0=todayS(),last=new Date(st.y,st.m+1,0).getDate();
   const days=[];for(let i=1;i<=last;i++)days.push(mKey()+'-'+pad(i));
   const upto=days.filter(d=>d<=t0);
-  const H=D.habits;
+  const H=D.habits.filter(x=>!x.arch||days.some(d=>habitDone(x,d)));
   const mt=D.tasks.filter(t=>t.month===mKey()&&inMonthList(t));
   const St=statsFor(days);
   const diaries=days.filter(d=>D.diary&&D.diary[d]).slice(-8);
@@ -700,7 +702,10 @@ const iconsOf=t=>{try{return [...new Intl.Segmenter('ko',{granularity:'grapheme'
 const hbMark=hb=>hb.icon||'♥';
 function habitDone(hb,d){return ((data().hchk||{})[d]||[]).includes(hb.id)}
 // 습관 요일: 없으면 매일. 정한 요일만 칸·달성률에 셈
-const habitOn=(hb,d)=>!!hb.goal||!Array.isArray(hb.dows)||!hb.dows.length||hb.dows.includes(dowOf(d));
+const isPaused=(hb,d)=>Array.isArray(hb.pauses)&&hb.pauses.some(p=>d>=p.a&&d<=p.b);
+const habitOn=(hb,d)=>!isPaused(hb,d)&&(!!hb.goal||!Array.isArray(hb.dows)||!hb.dows.length||hb.dows.includes(dowOf(d)));
+const activeHabits=()=>data().habits.filter(x=>!x.arch);
+const hNote=(hb,d)=>((data().hnote||{})[d]||{})[hb.id]||'';
 const habitDays=hb=>hb.goal?'주 '+hb.goal+'번':!Array.isArray(hb.dows)||!hb.dows.length||hb.dows.length===7?'매일':hb.dows.length===5&&[...hb.dows].sort().join()==='0,1,2,3,4'?'평일':[...hb.dows].sort().map(i=>DOW[i]).join('·');
 function toggleHabit(hb,d){
   const D=data();D.hchk=D.hchk||{};const a=D.hchk[d]||[];
@@ -709,8 +714,11 @@ function toggleHabit(hb,d){
 }
 function habitStreak(hb,t0){ // 오늘까지 이어서 한 날 (쉬는 요일은 건너뜀). 주 N번이면 이어서 채운 주
   if(hb.goal){let n=0;const x=parse(t0);x.setDate(x.getDate()-dowOf(t0));
-    if(weekCount(hb,t0)>=hb.goal)n++;
-    for(let i=0;i<60;i++){x.setDate(x.getDate()-7);if(weekCount(hb,ymd(x))>=hb.goal)n++;else break}
+    for(let i=0;i<60;i++,x.setDate(x.getDate()-7)){
+      const ds=[];for(let k=0;k<7;k++){const y=new Date(x);y.setDate(x.getDate()+k);const d=ymd(y);if(d<=t0&&!isPaused(hb,d))ds.push(d)}
+      const c=ds.filter(d=>habitDone(hb,d)).length,full=i===0?hb.goal:Math.round(hb.goal*ds.length/7);
+      if(i===0){if(c>=hb.goal)n++;continue} // 이번 주는 진행 중
+      if(!full)continue;if(c>=full)n++;else break}
     return n}
   let n=0;const x=parse(t0);
   for(let i=0;i<400;i++,x.setDate(x.getDate()-1)){const d=ymd(x);if(!habitOn(hb,d))continue;if(habitDone(hb,d))n++;else if(d!==t0)break}
@@ -720,7 +728,7 @@ function habitStreak(hb,t0){ // 오늘까지 이어서 한 날 (쉬는 요일은
 function weeksIn(days){const m={};for(const d of days){const x=parse(d);x.setDate(x.getDate()-dowOf(d));(m[ymd(x)]=m[ymd(x)]||[]).push(d)}return m}
 function weekCount(hb,d){const x=parse(d);x.setDate(x.getDate()-dowOf(d));let n=0;for(let i=0;i<7;i++){if(habitDone(hb,ymd(x)))n++;x.setDate(x.getDate()+1)}return n}
 function habitRate(hb,days){
-  if(hb.goal){const W=weeksIn(days);let got=0,of=0,n=0;
+  if(hb.goal){const W=weeksIn(days.filter(d=>!isPaused(hb,d)));let got=0,of=0,n=0;
     const t0=todayS();
     for(const k in W){const ds=W[k],c=ds.filter(d=>habitDone(hb,d)).length;n+=c;
       // 달의 처음·끝에 걸친 짧은 주는 날 수만큼만, 지금 주는 아직 진행 중이라 깎지 않음
@@ -732,7 +740,7 @@ function habitRate(hb,days){
 function prevMonthDays(){const y=st.m===0?st.y-1:st.y,m=st.m===0?11:st.m-1;const n=new Date(y,m+1,0).getDate();const a=[];for(let i=1;i<=n;i++)a.push(y+'-'+pad(m+1)+'-'+pad(i));return a}
 function diffTxt(now,prev){if(prev==null)return '';const d=now-prev;return d===0?' · 지난달과 같아요':' · 지난달보다 '+(d>0?'+':'')+d+'%'}
 function vHabit(){
-  const D=data(),H=D.habits,t0=todayS();
+  const D=data(),H=activeHabits(),ARCH=D.habits.filter(x=>x.arch),t0=todayS();
   const last=new Date(st.y,st.m+1,0).getDate();
   const pages=[[1,10],[11,20],[21,last]];
   if(st.hpage==null){const td=parse(t0);st.hpage=td.getFullYear()===st.y&&td.getMonth()===st.m?Math.min(2,Math.floor((td.getDate()-1)/10)):0}
@@ -744,27 +752,36 @@ function vHabit(){
   const inp=h('input',{id:'hAdd',placeholder:'예: 헬스장, 영어공부, 물 2L',maxlength:'20',on:{keydown:e=>{if(e.key==='Enter'&&!e.isComposing)go()}}});
   function go(){const v=inp.value.trim().slice(0,20);if(!v){toast('습관 이름을 적어 주세요');return}
     const hb={id:uid(),name:v,tag:st.addTag,dows:null};D.habits.push(hb);inp.value='';save();render();toast(v+' 습관을 넣었어요 · 이름을 누르면 요일을 정해요')}
-  const cell=(hb,d,cls)=>{const on=habitDone(hb,d),sch=habitOn(hb,d);
-    return h('button',{type:'button',class:'ht-c'+(on?' on c'+cls:'')+(d>t0?' fut':'')+(sch?'':' off')+(d===t0?' now':''),'aria-label':md(d)+' '+hb.name+(on?' 했어요':sch?' 안 했어요':' 쉬는 날'),'aria-pressed':on?'true':'false',text:on?(all?'':(hb.icon||'✓')):(sch||all?'':'·'),on:{click:()=>toggleHabit(hb,d)}})};
+  const cell=(hb,d,cls)=>{const on=habitDone(hb,d),pz=isPaused(hb,d),sch=habitOn(hb,d),memo=hNote(hb,d);
+    const b=h('button',{type:'button',class:'ht-c'+(on?' on c'+cls:'')+(d>t0?' fut':'')+(sch?'':' off')+(pz?' pz':'')+(d===t0?' now':'')+(memo?' memo':''),'data-hb':hb.id,'data-d':d,
+      'aria-label':md(d)+' '+hb.name+(on?' 했어요':pz?' 쉬는 기간':sch?' 안 했어요':' 쉬는 날')+(memo?' · 메모 '+memo:'')+' · 길게 누르면 메모',title:memo||null,'aria-pressed':on?'true':'false',
+      text:on?(all?'':(hb.icon||'✓')):pz&&!all?'⏸':(sch||all?'':'·'),on:{click:()=>{if(Date.now()<HL.until)return;toggleHabit(hb,d)},contextmenu:e=>{e.preventDefault();if(Date.now()<HL.until)return;memoSheet(hb,d)}}});
+    return b};
   const tbl=h('div',{class:'ht'+(all?' all':''),style:'--n:'+days.length},
     h('div',{class:'ht-r ht-head'},h('span',{class:'ht-n'}),days.map(d=>{const n=+d.slice(8);return h('span',{class:'ht-d'+(d===t0?' tdy':'')+(dowOf(d)===6||holOf(d)?' red':dowOf(d)===5?' blue':'')},all?(n===1||n%5===0?h('b',{text:String(n)}):h('b',{text:'\u00a0'})):[h('b',{text:String(n)}),DOW[dowOf(d)]])}),h('span',{class:'ht-s',text:'이번 달'})),
-    H.map((hb,hi)=>{const cls=okTag(hb.tag)?colOf(hb.tag):'n';const r=habitRate(hb,upto);
+    H.map(hb=>{const hi=D.habits.indexOf(hb);const cls=okTag(hb.tag)?colOf(hb.tag):'n';const r=habitRate(hb,upto);
       return h('div',{class:'ht-r','data-hab':hi},
-        h('span',{class:'ht-n'},h('span',{class:'grip hg','aria-hidden':'true',text:'≡'}),h('button',{type:'button',class:'ht-nb tc'+cls,title:hb.name+' · '+habitDays(hb),on:{click:()=>habitSheet(hb)}},hb.icon?h('span',{class:'hic',text:hb.icon}):null,hb.name)),
+        h('span',{class:'ht-n'},h('span',{class:'grip hg','aria-hidden':'true',text:'≡'}),h('button',{type:'button',class:'ht-nb tc'+cls,title:hb.name+' · '+habitDays(hb),on:{click:()=>habitSheet(hb)}},hb.icon?h('span',{class:'hic',text:hb.icon}):null,hb.name,hb.time?h('small',{class:'htm',text:'⏰'}):null)),
         days.map(d=>cell(hb,d,cls)),
         h('span',{class:'ht-s',text:hb.goal?'주 '+weekCount(hb,t0)+'/'+hb.goal:r.n+'/'+r.of}))}));
   const reps=D.reps;
+  const recentMemos=[];for(const d of [...monthDays].reverse()){const o=(D.hnote||{})[d]||{};for(const hb of H)if(o[hb.id])recentMemos.push({d,hb,t:o[hb.id]});if(recentMemos.length>=6)break}
   return [head('습관',H.length?'습관 '+H.length+'개':'매일 체크'),
     h('div',{class:'add'},inp,h('button',{class:'go',type:'button',text:'추가',on:{click:go}})),tagPicker(),
     h('div',{class:'weeks'},pages.map(([a,b],i)=>h('button',{type:'button',class:'chip'+(!all&&i===st.hpage?' on':''),text:a+'~'+b+'일',on:{click:()=>{st.hview=null;st.hpage=i;render()}}})),
       h('button',{type:'button',class:'chip'+(all?' on':''),text:'한 달 한눈에',on:{click:()=>{st.hview=all?null:'month';render()}}})),
     H.length?tbl:h('div',{class:'empty'},h('div',{text:'아직 습관이 없어요. 위에 "헬스장"처럼 적어서 넣어요.'})),
-    H.length?h('p',{class:'hint',text:'습관 이름을 누르면 아이콘·요일·주 몇 번 목표·색을 정해요. ≡ 를 끌면 순서가 바뀌어요. 옆으로 밀면 다음 달.'}):null,
+    H.length?h('p',{class:'hint',text:'칸을 누르면 체크, 길게 누르면 메모(벤치 60kg 등). 습관 이름을 누르면 아이콘·요일·목표·알림·쉬는 기간을 정해요. ≡ 를 끌면 순서가 바뀌어요.'}):null,
+    recentMemos.length?h('div',{class:'mlist'},h('b',{text:'최근 메모'}),recentMemos.slice(0,6).map(m=>h('button',{type:'button',class:'mrow',on:{click:()=>memoSheet(m.hb,m.d)}},h('span',{class:'md',text:md(m.d)}),h('span',{class:'tc'+(okTag(m.hb.tag)?colOf(m.hb.tag):'n'),text:(m.hb.icon||'♥')+' '+m.hb.name.slice(0,8)}),h('span',{class:'mt',text:m.t})))):null,
     H.length&&upto.length?h('div',{class:'rbox'},h('b',{text:(st.m+1)+'월 달성률'}),H.map(hb=>{const r=habitRate(hb,upto),cls=okTag(hb.tag)?colOf(hb.tag):'n',streak=habitStreak(hb,t0);
       const pm=prevMonthDays(),pr=pm.some(d=>habitDone(hb,d))?habitRate(hb,pm).pc:null;
       return h('div',{class:'rrow2'},h('div',{class:'rrow'},h('span',{class:'rn tc'+cls,text:(hb.icon?hb.icon+' ':'')+hb.name.slice(0,10)}),h('span',{class:'rbar'},h('i',{class:'c'+cls,style:'width:'+r.pc+'%'})),h('span',{class:'rp',text:r.pc+'%'+(streak>=2?' 🔥'+streak+(hb.goal?'주':''):'')})),
-        h('small',{class:'rsub',text:(hb.goal?'주 '+hb.goal+'번 목표 · ':habitDays(hb)+' · ')+r.n+'번 했어요'+diffTxt(r.pc,pr)}))})):null,
+        h('small',{class:'rsub',text:(hb.goal?'주 '+hb.goal+'번 목표 · ':habitDays(hb)+' · ')+(hb.time?'⏰'+hb.time+' · ':'')+r.n+'번 했어요'+diffTxt(r.pc,pr)}))})):null,
     H.length?h('button',{type:'button',class:'btn',style:'margin:8px 0',text:'🖼 이번 달 돌아보기 이미지',on:{click:()=>monthImage()}}):null,
+    ARCH.length?[h('div',{class:'sec',text:'보관한 습관 '+ARCH.length+' · 기록은 그대로 남아요'}),h('div',{class:'list'},ARCH.map(hb=>{const n=Object.values(D.hchk||{}).filter(a=>a.includes(hb.id)).length;
+      return h('div',{class:'row'},h('div',{class:'top'},h('span',{class:'txt',text:(hb.icon?hb.icon+' ':'')+hb.name+' · '+n+'번 했어요'}),
+        h('button',{type:'button',class:'chip on',text:'되살리기',on:{click:()=>{hb.arch=false;save();render();toast(hb.name+' 습관을 되살렸어요')}}}),
+        h('button',{type:'button',class:'chip',text:'지우기',on:{click:()=>delHabit(hb)}})))}))]:null,
     reps.length?[h('div',{class:'sec',text:'반복 일정 중 습관으로 옮기기'}),h('p',{class:'hint',text:'예전에 반복으로 넣은 것 중 습관(헬스·공부 등)만 옮기면 달력에서 빠지고 여기서 체크해요. 학원·청소 같은 일정은 그대로 두세요.'}),
       h('div',{class:'list'},reps.map(r=>h('div',{class:'row'},h('div',{class:'top'},h('span',{class:'txt',text:r.text+' · '+repLabel(r)}),h('button',{type:'button',class:'chip on',text:'습관으로',on:{click:()=>repToHabit(r)}})))))]:null];
 }
@@ -774,6 +791,35 @@ function repToHabit(r){
   D.tasks=D.tasks.filter(t=>t.rep!==r.id&&t.fromRep!==r.id);
   D.reps=D.reps.filter(x=>x!==r);save();render();toast(hb.name+'을(를) 습관으로 옮겼어요');
 }
+function delHabit(hb,after){
+  const D=data();
+  const close=sheet(h('h3',{text:hb.name+' 지우기'}),h('p',{text:'체크와 메모 기록이 모두 지워져요. 기록을 남기려면 "보관함으로"를 쓰세요.'}),
+    h('button',{class:'btn del',type:'button',text:'완전히 지우기',on:{click:()=>{D.habits=D.habits.filter(x=>x!==hb);
+      for(const d in D.hchk){D.hchk[d]=D.hchk[d].filter(x=>x!==hb.id);if(!D.hchk[d].length)delete D.hchk[d]}
+      for(const d in D.hnote){delete D.hnote[d][hb.id];if(!Object.keys(D.hnote[d]).length)delete D.hnote[d]}
+      save();close();render();toast('지웠어요')}}}),
+    h('button',{class:'btn',type:'button',text:'그만두기',on:{click:()=>{close();if(after)after()}}}));
+}
+// 습관 칸 메모 (길게 누르기): 적으면 그 날 한 것으로 체크
+function memoSheet(hb,d){
+  const D=data();const ti=h('input',{id:'hMemo',maxlength:'40',placeholder:'예: 벤치 60kg, 단어 30개, 5km'});ti.value=hNote(hb,d);
+  const go=()=>{const v=ti.value.trim().slice(0,40);D.hnote=D.hnote||{};
+    if(v){(D.hnote[d]=D.hnote[d]||{})[hb.id]=v;if(!habitDone(hb,d)){D.hchk[d]=[...(D.hchk[d]||[]),hb.id]}}
+    else if(D.hnote[d]){delete D.hnote[d][hb.id];if(!Object.keys(D.hnote[d]).length)delete D.hnote[d]}
+    save();close();render();toast(v?md(d)+' '+hb.name+' 메모 남겼어요':'메모를 지웠어요')};
+  ti.addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.isComposing)go()});
+  const close=sheet(h('h3',{text:md(d)+' '+(hb.icon?hb.icon+' ':'')+hb.name}),h('p',{text:habitDone(hb,d)?'했어요 ✓':'메모를 적으면 했다고 체크돼요'}),ti,
+    h('button',{class:'btn pri',type:'button',text:'저장',on:{click:go}}),
+    hNote(hb,d)?h('button',{class:'btn del',type:'button',text:'메모 지우기',on:{click:()=>{ti.value='';go()}}}):null);
+  setTimeout(()=>ti.focus(),60);
+}
+// 습관 칸 길게 누르기 → 메모 (손가락)
+const HL={timer:null,el:null,x:0,y:0,until:0};
+document.addEventListener('touchstart',e=>{const el=e.target.closest('.ht-c[data-hb]');if(!el)return;const p=e.touches[0];
+  Object.assign(HL,{el,x:p.clientX,y:p.clientY});clearTimeout(HL.timer);
+  HL.timer=setTimeout(()=>{const hb=data().habits.find(x=>x.id===el.dataset.hb);HL.el=null;if(!hb)return;HL.fired=true;HL.until=Date.now()+5000;try{navigator.vibrate&&navigator.vibrate(12)}catch(_){}memoSheet(hb,el.dataset.d)},500)},{passive:true});
+document.addEventListener('touchmove',e=>{if(!HL.el)return;const p=e.touches[0];if(Math.abs(p.clientX-HL.x)>8||Math.abs(p.clientY-HL.y)>8){clearTimeout(HL.timer);HL.el=null}},{passive:true});
+document.addEventListener('touchend',()=>{clearTimeout(HL.timer);HL.el=null;if(HL.fired){HL.fired=false;HL.until=Date.now()+350}});
 function habitSheet(hb){
   const ni=h('input',{id:'hName',maxlength:'20'});ni.value=hb.name;let tag=hb.tag;
   let dows=new Set(Array.isArray(hb.dows)&&hb.dows.length?hb.dows:[0,1,2,3,4,5,6]);
@@ -798,10 +844,26 @@ function habitSheet(hb){
   const drawT=()=>tagRow.replaceChildren(...[null,...tagIdx()].map(i=>h('button',{type:'button',class:'chip'+(tag===i?' on':''),on:{click:()=>{tag=i;drawT()}}},i==null?'없음':[h('i',{class:'c'+colOf(i)}),tagName(i)])));
   drawT();
   const D=data();
+  const tm=h('input',{type:'time',id:'hTime'});tm.value=hb.time||'';
+  let pauses=(hb.pauses||[]).map(p=>({a:p.a,b:p.b}));
+  const pa=h('input',{type:'date',id:'pA'}),pb=h('input',{type:'date',id:'pB'});
+  {const t=todayS(),x=parse(t);x.setDate(x.getDate()+6);pa.value=t;pb.value=ymd(x)}
+  const pRow=h('div');
+  const drawP=()=>pRow.replaceChildren(...[
+    pauses.length?pauses.map((p,i)=>h('div',{class:'set'},h('span',{text:'⏸ '+md(p.a)+' ~ '+md(p.b)}),h('button',{type:'button',class:'chip',text:'빼기',on:{click:()=>{pauses.splice(i,1);drawP()}}}))):h('p',{text:'여행이나 아플 때 기간을 정하면 그동안은 안 세고, 연속 기록도 안 끊겨요.'}),
+    h('div',{class:'two'},h('label',null,h('span',{text:'시작'}),pa),h('label',null,h('span',{text:'끝'}),pb)),
+    h('button',{type:'button',class:'btn',style:'margin-top:4px',text:'+ 쉬는 기간 넣기',on:{click:()=>{const a=pa.value,b=pb.value;if(!isDate(a)||!isDate(b)){toast('날짜를 골라 주세요');return}
+      pauses.push(a<=b?{a,b}:{a:b,b:a});pauses.sort((x,y)=>x.a<y.a?-1:1);drawP()}}})].flat(Infinity).filter(x=>x!=null));
+  drawP();
   const close=sheet(h('h3',{text:'습관 고치기'}),ni,h('div',{class:'sec',text:'아이콘'}),iRow,h('div',{class:'sec',text:'목표'}),gRow,h('div',{class:'sec',text:'하는 요일 (요일마다일 때)'}),dRow,h('div',{class:'sec',text:'색 (카테고리)'}),tagRow,
+    h('div',{class:'sec',text:'알림 시간'}),h('div',{class:'set'},h('span',null,'이 시간에 "'+hb.name.slice(0,10)+' 할 시간이에요"',h('small',{text:B?'한 날·쉬는 날은 안 울려요. 비우면 알림 없음':'알림은 안드로이드 앱에서 울려요'})),tm),
+    h('div',{class:'sec',text:'쉬는 기간'}),pRow,
     h('button',{class:'btn pri',type:'button',text:'저장',on:{click:()=>{const v=ni.value.trim().slice(0,20);if(!v){toast('이름을 적어 주세요');return}if(!dows.size){toast('요일을 하나 이상 골라 주세요');return}
-      hb.name=v;hb.tag=tag;hb.icon=icon;hb.goal=goal;hb.dows=dows.size===7?null:[...dows].sort();save();close();render();toast((icon?icon+' ':'')+v+' · '+habitDays(hb))}}}),
-    h('button',{class:'btn del',type:'button',text:'이 습관 지우기 (체크 기록도 지워져요)',on:{click:()=>{D.habits=D.habits.filter(x=>x!==hb);for(const d in D.hchk){D.hchk[d]=D.hchk[d].filter(x=>x!==hb.id);if(!D.hchk[d].length)delete D.hchk[d]}save();close();render();toast('지웠어요')}}}));
+      hb.name=v;hb.tag=tag;hb.icon=icon;hb.goal=goal;hb.dows=dows.size===7?null:[...dows].sort();
+      hb.time=isTime(tm.value)?tm.value:null;hb.pauses=pauses.length?pauses:null;if(hb.time&&B&&!demo)B.requestNoti();
+      save();close();render();toast((icon?icon+' ':'')+v+' · '+habitDays(hb))}}}),
+    h('button',{class:'btn',type:'button',text:'📦 보관함으로 (그만둬도 기록은 남아요)',on:{click:()=>{hb.arch=true;save();close();render();toast(hb.name+' 습관을 보관했어요')}}}),
+    h('button',{class:'btn del',type:'button',text:'완전히 지우기',on:{click:()=>{close();delHabit(hb,()=>habitSheet(hb))}}}));
 }
 
 function gearBtn(){const b=h('button',{type:'button','aria-label':'설정',on:{click:settingsSheet}});b.append(svg(GEAR));return b}
@@ -968,7 +1030,7 @@ function settingsSheet(){
     Array.from({length:24},(_,i)=>{const o=h('option',{value:String(i),text:i+'시'});if(i===v)o.selected=true;return o}));return x};
   const draw=()=>{
     const w=h('div',{class:'widget'},h('div',{class:'wh'},h('span',{text:'덤푸 · 오늘 '+md(t0)}),h('span',{text:today.length?today.filter(t=>t.done).length+'/'+today.length:''})),
-      D.habits.some(x=>habitOn(x,t0))?h('div',{class:'wr',style:'color:var(--t6);font-weight:700;flex-wrap:wrap'},D.habits.filter(x=>habitOn(x,t0)).map(x=>h('button',{type:'button',style:'color:inherit;font-weight:700;margin-right:10px',text:(habitDone(x,t0)?'♥ ':'♡ ')+(x.icon?x.icon+' ':'')+x.name,on:{click:()=>{toggleHabit(x,t0);settingsSheet()}}}))):null,
+      D.habits.some(x=>!x.arch&&habitOn(x,t0))?h('div',{class:'wr',style:'color:var(--t6);font-weight:700;flex-wrap:wrap'},D.habits.filter(x=>!x.arch&&habitOn(x,t0)).map(x=>h('button',{type:'button',style:'color:inherit;font-weight:700;margin-right:10px',text:(habitDone(x,t0)?'♥ ':'♡ ')+(x.icon?x.icon+' ':'')+x.name,on:{click:()=>{toggleHabit(x,t0);settingsSheet()}}}))):null,
       today.length?today.slice(0,4).map(t=>h('div',{class:'wr'},h('button',{class:'ck'+(t.done?' on':''),type:'button','aria-label':'완료',on:{click:()=>{t.done=!t.done;t.doneAt=t.done?t0:null;save();render();settingsSheet()}}},t.done?'✓':''),h('span',{text:(t.time?t.time+' ':'')+t.text,style:t.done?'text-decoration:line-through;color:var(--muted)':''}))):h('div',{class:'wr',style:'color:var(--muted)',text:'오늘 할 일이 없어요'}));
     const sw=h('button',{type:'button',class:'sw'+(S.alarm?' on':''),'aria-label':'아침 알림',on:{click:()=>{S.alarm=!S.alarm;if(S.alarm&&B&&!demo)B.requestNoti();save();draw()}}});
     const hsw=h('button',{type:'button',class:'sw'+(S.hol?' on':''),'aria-label':'공휴일 표시',on:{click:()=>{S.hol=!S.hol;save();render();draw()}}});
@@ -1319,9 +1381,13 @@ function importData(o){
   for(const x of (Array.isArray(d.habits)?d.habits:[]).slice(0,100)){if(!x||!okId(x.id))continue;const name=cleanStr(x.name,20).trim();if(!name)continue;
     const dw=Array.isArray(x.dows)?[...new Set(x.dows.filter(v=>Number.isInteger(v)&&v>=0&&v<7))].sort():[];
     const okIcon=typeof x.icon==='string'&&ICON_SETS.some(([,v])=>iconsOf(v).includes(x.icon));
-    out.habits.push({id:x.id,name,tag:Number.isInteger(x.tag)&&x.tag>=0&&x.tag<8?x.tag:null,dows:dw.length&&dw.length<7?dw:null,icon:okIcon?x.icon:null,goal:Number.isInteger(x.goal)&&x.goal>=1&&x.goal<=7?x.goal:null})}
+    const ps=(Array.isArray(x.pauses)?x.pauses:[]).filter(p=>p&&isDate(p.a)&&isDate(p.b)).slice(0,50).map(p=>p.a<=p.b?{a:p.a,b:p.b}:{a:p.b,b:p.a});
+    out.habits.push({id:x.id,arch:x.arch===true,time:isTime(x.time)?x.time:null,pauses:ps.length?ps:null,name,tag:Number.isInteger(x.tag)&&x.tag>=0&&x.tag<8?x.tag:null,dows:dw.length&&dw.length<7?dw:null,icon:okIcon?x.icon:null,goal:Number.isInteger(x.goal)&&x.goal>=1&&x.goal<=7?x.goal:null})}
   if(d.hchk&&typeof d.hchk==='object'&&!Array.isArray(d.hchk)){const ids=new Set(out.habits.map(x=>x.id));let n=0;
     for(const k in d.hchk){if(!isDate(k)||++n>20000||!Array.isArray(d.hchk[k]))continue;const a=[...new Set(d.hchk[k].filter(v=>ids.has(v)))];if(a.length)out.hchk[k]=a}}
+  if(d.hnote&&typeof d.hnote==='object'&&!Array.isArray(d.hnote)){const ids=new Set(out.habits.map(x=>x.id));let n=0;
+    for(const k in d.hnote){if(!isDate(k)||++n>20000)continue;const v=d.hnote[k];if(!v||typeof v!=='object')continue;const o={};
+      for(const id in v){if(ids.has(id)){const t=cleanStr(v[id],40).trim();if(t)o[id]=t}}if(Object.keys(o).length)out.hnote[k]=o}}
   const S=d.settings||{};
   out.settings.alarm=S.alarm===true;out.settings.time=isTime(S.time)?S.time:'08:00';out.settings.hol=S.hol!==false;out.settings.early=S.early===true;out.settings.late=S.late===true;out.settings.palV=2;out.settings.hourly=S.hourly===true;out.settings.hFrom=Number.isInteger(S.hFrom)&&S.hFrom>=0&&S.hFrom<24?S.hFrom:9;out.settings.hTo=Number.isInteger(S.hTo)&&S.hTo>=0&&S.hTo<24?S.hTo:22;
   if(Array.isArray(S.tags)&&S.tags.length){out.settings.tags=S.tags.slice(0,8).map((x,i)=>cleanStr(x,8).trim()||('카테고리'+(i+1)))}
@@ -1380,6 +1446,7 @@ function onBack2App(){applyWidgetOps();render();syncNative()}
 window.__onResume=onBack2App;
 document.addEventListener('focusin',e=>{if(e.target.closest('#app input,#app textarea'))document.body.classList.add('typing')});
 document.addEventListener('focusout',()=>document.body.classList.remove('typing'));
+window.__openHabit=function(){closePop();if(closeLayer)closeLayer();st.tab='habit';st.y=now.getFullYear();st.m=now.getMonth();st.hpage=null;render();return true};
 window.__openDaily=function(){closePop();if(closeLayer)closeLayer();st.day=todayS();st.tab='daily';render();setTimeout(()=>{const n=document.querySelector('.tt-r.now');if(n)n.scrollIntoView({block:'center'})},50)};
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')onBack2App()});
 })();
