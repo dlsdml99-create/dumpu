@@ -29,16 +29,18 @@
             android:textSize="13sp"
             android:textStyle="bold" />
     </LinearLayout>
-    <TextView
-        android:id="@+id/w_rt"
+    <LinearLayout
+        android:id="@+id/w_hab"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
         android:paddingBottom="2dp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="#E64980"
-        android:textSize="13sp"
-        android:visibility="gone" />
+        android:visibility="gone">
+        <TextView android:id="@+id/w_h0" style="@style/WHab" />
+        <TextView android:id="@+id/w_h1" style="@style/WHab" />
+        <TextView android:id="@+id/w_h2" style="@style/WHab" />
+        <TextView android:id="@+id/w_h3" style="@style/WHab" />
+    </LinearLayout>
     <TextView android:id="@+id/w_r0" style="@style/WRow" />
     <TextView android:id="@+id/w_r1" style="@style/WRow" />
     <TextView android:id="@+id/w_r2" style="@style/WRow" />

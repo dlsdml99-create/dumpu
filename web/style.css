@@ -341,3 +341,14 @@ body.typing .mtop{position:static}
 body.painting{-webkit-user-select:none;user-select:none}
 .ghost.pg{transform:translate(-50%,-160%)}
 @media (max-width:340px){.ht-r{grid-template-columns:minmax(44px,1fr) repeat(var(--n),minmax(18px,1fr)) 28px}.ht-d{font-size:9px}.ht-d b{font-size:12px}.ht-s{font-size:10px}}
+/* v2.2: 습관 쉬는 요일, 한 달 한눈에 */
+.ht-c.off{border-style:dashed;opacity:.35;color:var(--muted)}
+.ht-c.off.on{opacity:1;border-style:solid}
+.ht.all .ht-r{grid-template-columns:minmax(48px,1fr) repeat(var(--n),minmax(0,1fr)) 30px;gap:1px}
+.ht.all .ht-c{aspect-ratio:auto;height:22px;border-radius:3px;border-width:1px;font-size:0}
+.ht.all .ht-d.tdy b{background:none;color:inherit}
+.ht-c.now{box-shadow:0 0 0 2px var(--lemon)}
+.ht.all .ht-d b{white-space:nowrap;overflow:visible}
+.ht.all .ht-d{font-size:0}
+.ht.all .ht-d b{font-size:9px;padding:0}
+.ht.all .ht-d.tdy b{padding:0 1px}

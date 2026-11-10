@@ -18,6 +18,7 @@ import java.util.Calendar;
 public class DumpuWidget extends AppWidgetProvider {
     static final String ACTION_TOGGLE = "io.github.dlsdml99create.dumpu.TOGGLE";
     private static final int[] ROWS = {R.id.w_r0, R.id.w_r1, R.id.w_r2, R.id.w_r3};
+    private static final int[] HABS = {R.id.w_h0, R.id.w_h1, R.id.w_h2, R.id.w_h3};
     private static final String[] DOW = {"일", "월", "화", "수", "목", "금", "토"};
 
     @Override
@@ -53,20 +54,25 @@ public class DumpuWidget extends AppWidgetProvider {
                 + "(" + DOW[cal.get(Calendar.DAY_OF_WEEK) - 1] + ")");
 
         JSONArray all = Store.items(c, Store.today());
-        // 루틴(반복 할 일)은 위에 ♥ 줄로, 나머지만 체크 줄로
+        // 습관은 위에 ♥ 줄로 (하나씩 눌러 체크), 나머지는 체크 줄로
         JSONArray a = new JSONArray();
-        StringBuilder rt = new StringBuilder();
+        JSONArray hb = new JSONArray();
         for (int k = 0; k < all.length(); k++) {
             JSONObject o = all.optJSONObject(k);
             if (o == null) continue;
-            if (o.optBoolean("r")) {
-                if (rt.length() > 0) rt.append("  ");
-                rt.append(o.optBoolean("done") ? "♥ " : "♡ ").append(o.optString("text"));
-            } else a.put(o);
+            if (o.optBoolean("r")) hb.put(o); else a.put(o);
         }
-        v.setTextViewText(R.id.w_rt, rt);
-        v.setViewVisibility(R.id.w_rt, rt.length() > 0 ? View.VISIBLE : View.GONE);
-        v.setOnClickPendingIntent(R.id.w_rt, openApp(c));
+        for (int k = 0; k < HABS.length; k++) {
+            JSONObject o = k < hb.length() ? hb.optJSONObject(k) : null;
+            if (o == null) { v.setViewVisibility(HABS[k], View.GONE); continue; }
+            v.setViewVisibility(HABS[k], View.VISIBLE);
+            v.setTextViewText(HABS[k], (o.optBoolean("done") ? "♥ " : "♡ ") + o.optString("text"));
+            Intent t = new Intent(c, DumpuWidget.class).setAction(ACTION_TOGGLE).putExtra("id", o.optString("id"));
+            v.setOnClickPendingIntent(HABS[k], PendingIntent.getBroadcast(c, 200 + k, t,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        }
+        v.setViewVisibility(R.id.w_hab, hb.length() > 0 ? View.VISIBLE : View.GONE);
+        boolean rtEmpty = hb.length() == 0;
         int done = 0;
         for (int k = 0; k < a.length(); k++) if (a.optJSONObject(k) != null && a.optJSONObject(k).optBoolean("done")) done++;
         v.setTextViewText(R.id.w_count, a.length() == 0 ? "" : done + "/" + a.length());
@@ -74,7 +80,7 @@ public class DumpuWidget extends AppWidgetProvider {
         for (int k = 0; k < ROWS.length; k++) {
             JSONObject o = k < a.length() ? a.optJSONObject(k) : null;
             if (o == null) {
-                if (k == 0 && a.length() == 0 && rt.length() == 0) {
+                if (k == 0 && a.length() == 0 && rtEmpty) {
                     v.setViewVisibility(ROWS[k], View.VISIBLE);
                     v.setTextViewText(ROWS[k], "오늘 할 일이 없어요");
                     v.setOnClickPendingIntent(ROWS[k], openApp(c));
