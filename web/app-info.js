@@ -17,12 +17,12 @@
     if (!el) return;
     el.textContent = 'v' + I.version;
     el.classList.toggle('new', !!hasNew());
-    el.setAttribute('aria-label', hasNew() ? '새 버전 v' + latest + '이 나왔어요' : '버전 정보 v' + I.version);
+    el.setAttribute('aria-label', hasNew() ? '새 버전(v' + latest + ')이 나왔어요' : '버전 정보 v' + I.version);
     if (statusEl) statusEl.textContent = statusText();
   }
   function statusText() {
     if (!I.online) return '미리보기에서는 새 버전을 확인하지 않아요';
-    if (hasNew()) return '새 버전 v' + latest + '이 나왔어요';
+    if (hasNew()) return '새 버전(v' + latest + ')이 나왔어요';
     return '지금 쓰는 버전이 최신이에요';
   }
 
@@ -50,7 +50,7 @@
   function promptOnce() {
     if (asked || dlg || layer) return;
     var k = 'appinfo.later';
-    try { var t = +localStorage.getItem(k) || 0; if (resumed && Date.now() - t < 6 * 3600e3) return; } catch (e) {}
+    try { var t = +localStorage.getItem(k) || 0; if (Date.now() - t < 6 * 3600e3) return; } catch (e) {} // '나중에'를 누르면 6시간 동안은 다시 묻지 않아요
     asked = true;
     dlg = mk('div', 'dim upd-dim');
     var box = mk('div', 'upd-box'); box.setAttribute('role', 'alertdialog'); box.setAttribute('aria-labelledby', 'upd-t');
@@ -77,7 +77,8 @@
   function render() {
     if (!sheetBox) return;
     sheetBox.replaceChildren();
-    var h3 = mk('h3'); h3.append(I.name + ' '); h3.append(mk('span', 'pill', 'v' + I.version));
+    var h3 = mk('h3'); h3.append(I.name + ' '); h3.append(mk('span', 'pill' + (hasNew() ? ' new' : ''), 'v' + I.version));
+    var xb = mk('button', 'ai-x', '닫기'); xb.type = 'button'; xb.setAttribute('aria-label', '정보 창 닫기'); xb.onclick = function () { close(); }; h3.append(xb);
     statusEl = mk('p', null, statusText());
     sheetBox.append(h3, statusEl);
     if (hasNew()) {

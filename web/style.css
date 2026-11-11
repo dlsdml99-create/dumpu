@@ -420,3 +420,10 @@ body.painting{-webkit-user-select:none;user-select:none}
 .brbtn{flex:none;width:30px;height:30px;border-radius:50%;background:var(--card);border:1.5px solid var(--line);font-size:14px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto}
 .brbtn.on{border-color:var(--cobalt);background:var(--cobalt)}
 .brbtn+.tmgo{margin-left:6px}
+
+/* v2.9 정보 창 닫기, 좁은 화면(작은 폰·큰 글씨) 데일리 */
+.ai-x{float:right;font-size:14px;font-weight:600;color:var(--muted);padding:6px 4px}
+.pill.new{background:#F5B400;color:#1a1a1a}
+.tt-p .row .tm{white-space:nowrap}
+@media (max-width:380px){.tt-r{grid-template-columns:minmax(0,1fr) 22px minmax(120px,42%)}
+  .tt-p .row .top{flex-wrap:wrap;row-gap:4px}.tt-p .row .txt{flex:1 1 100%;min-width:0}.brbtn,.tmgo{width:28px;height:28px}}

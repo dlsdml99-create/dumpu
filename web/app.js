@@ -14,7 +14,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const isDate=s=>{if(typeof s!=='string'||!/^\d{4}-\d\d-\d\d$/.test(s))return false;const d=parse(s);return ymd(d)===s&&d.getFullYear()>=2000&&d.getFullYear()<=2100};
 const isTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 const MOODS=['😆','😊','🙂','😐','😔','😢','😠','😴']; // 오늘 기분
-const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},diary:{},habits:[],hchk:{},hnote:{},settings:{remind:10,alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
+const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},diary:{},mood:{},habits:[],hchk:{},hnote:{},settings:{remind:10,alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
 
 // ── 공휴일 (한국천문연구원 월력요항·정부 발표 기준, 2026~2028)
 const HOL={
@@ -246,15 +246,16 @@ function splitTime(line){
   if((ap==='오후'||ap==='저녁'||ap==='밤')&&hh<12)hh+=12;
   else if(ap==='오전'&&hh===12)hh=0;
   else if(!ap&&m[3]==null&&hh>=1&&hh<=6)hh+=12; // "3시 병원" → 오후 3시
-  if(hh>23||mm>59)return {text:line,time:null};
+  if(hh>23||mm>59)return {text:line,time:null,bad:true};
   return {text:m[5].trim(),time:pad(hh)+':'+pad(mm)};
 }
 function addTasks(text,extra){
   const lines=text.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>s.slice(0,200));
   if(!lines.length){toast('할 일을 적어 주세요');return 0}
-  for(const l of lines){const p=splitTime(l);
+  let bad=0;
+  for(const l of lines){const p=splitTime(l);if(p.bad)bad++;
     data().tasks.push(Object.assign({id:uid(),text:p.text,tag:st.addTag,rep:null,month:mKey(),week:null,day:null,time:p.time,done:false,doneAt:null},extra||{}))}
-  save();return lines.length;
+  save();if(bad)setTimeout(()=>toast('25시처럼 없는 시간은 시간 없이 넣었어요. 길게 눌러 시간을 고칠 수 있어요'),1600);return lines.length;
 }
 function toggle(t){const u=snap(t);delete t.autoDone;t.done=!t.done;t.doneAt=t.done?todayS():null;save();rerender();toast(t.done?md(t.doneAt)+' 완료로 기록했어요':'완료를 취소했어요',u)}
 const tagName=i=>data().settings.tags[i];
@@ -286,7 +287,7 @@ function lateBox(where){
   const t0=todayS();const label={month:'이번 달로',week:'이번 주로',day:'오늘로'}[where];
   return h('div',{class:'late-box'},h('span',null,'못 한 일 ',h('b',{text:L.length+'개'}),'가 밀려 있어요'),
     h('button',{class:'go',type:'button',style:'padding:6px 12px;font-size:13px',text:label,on:{click:()=>{
-      for(const t of L){t.month=mkOf(t0);t.week=where==='month'?null:weekOfDay(t0);t.day=where==='day'?t0:null}
+      for(const t of L){t.month=mkOf(t0);t.week=where==='month'?null:weekOfDay(t0);t.day=where==='day'?t0:null;if(where!=='day')delete t.src}
       save();render();toast(L.length+'개를 '+label+' 옮겼어요')}}}));
 }
 function labelSpans(s,cls){return labelsOf(s).map(l=>h('span',{class:(cls||'lab')+' '+l.c,text:l.t}))}
@@ -331,7 +332,7 @@ function dayImage(d){
   g.fillStyle=C.bg;g.fillRect(0,0,W,H);
   const dt=parse(d);
   g.fillStyle=C.acc;g.font='800 120px '+F;g.fillText(String(dt.getDate()),60,150);
-  g.fillStyle=C.ink;g.font='800 44px '+F;g.fillText(dt.getFullYear()+'. '+(dt.getMonth()+1)+'. '+DOW[dowOf(d)]+'요일',260,105);
+  g.fillStyle=C.ink;g.font='800 44px '+F;g.fillText(dt.getFullYear()+'년 '+(dt.getMonth()+1)+'월 '+dt.getDate()+'일 '+DOW[dowOf(d)]+'요일',260,105);
   g.fillStyle=C.mu;g.font='500 30px '+F;g.fillText(labelsOf(d).map(l=>l.t).join(' · ')||'덤푸 10분 플래너',260,150);
   let y=200;
   if(untimed.length){g.fillStyle=C.mu;g.font='700 28px '+F;g.fillText('시간 안 정한 할 일',60,y+30);y+=60;
@@ -346,7 +347,7 @@ function dayImage(d){
     g.fillStyle=C.ink;g.font='800 28px '+F;g.textAlign='center';g.fillText(hourLabel(hh),HX+HW/2,ry+38);g.textAlign='left';
     const plans=timed.filter(t=>+t.time.slice(0,2)===hh).map(t=>({tx:t.time+' '+t.text,c:hasTag(t)?cssVar('--t'+colOf(t.tag)):C.ink,done:t.done}));
     for(let k=0;k<6;k++){const sl=hh*6+k,v=L[sl];if(v&&v.startsWith('e:')&&L[sl-1]!==v){const it=logItem(v);if(it)plans.push({tx:'✎ '+slotT(sl)+' '+it.text,c:col(it)})}}
-    plans.slice(0,1).forEach(p=>{g.fillStyle=p.done?C.mu:p.c;g.font='600 26px '+F;const tx=p.tx.slice(0,20)+(plans.length>1?' 외 '+(plans.length-1):'');g.fillText(tx,PX+8,ry+37);if(p.done){g.fillRect(PX+8,ry+28,g.measureText(tx).width,3)}});
+    plans.slice(0,1).forEach(p=>{g.fillStyle=p.done?C.mu:p.c;g.font='600 26px '+F;const tx=p.tx.slice(0,20)+(plans.length>1?' (+'+(plans.length-1)+'개)':'');g.fillText(tx,PX+8,ry+37);if(p.done){g.fillRect(PX+8,ry+28,g.measureText(tx).width,3)}});
     for(let k=0;k<6;k++){const it=logItem(L[hh*6+k]);const x=GX+k*CW+3,yy=ry+8;
       g.fillStyle=it?col(it):C.card;g.fillRect(x,yy,CW-6,RH-16);g.strokeStyle=C.line;g.strokeRect(x,yy,CW-6,RH-16)}}
   g.beginPath();g.moveTo(PX,y+(h1-h0+1)*RH);g.lineTo(W-60,y+(h1-h0+1)*RH);g.stroke();
@@ -399,7 +400,7 @@ function monthImage(){
     for(const hb of H){const r=habitRate(hb,upto),sk=habitStreak(hb,t0>days[last-1]?days[last-1]:t0);
       const pr=pm.some(d=>habitDone(hb,d))?habitRate(hb,pm).pc:null;
       g.fillStyle=col(hb.tag);g.font='800 34px '+F;g.fillText(hbMark(hb)+' '+hb.name.slice(0,9),60,y+30);
-      if(pr!=null){const dd=r.pc-pr;g.font='600 24px '+F;g.fillStyle=dd>=0?cssVar('--t3'):cssVar('--t0');g.fillText('지난달 '+pr+'% → '+(dd>=0?'+':'')+dd+'%',440,y+62)}
+      if(pr!=null){const dd=r.pc-pr;g.font='600 24px '+F;g.fillStyle=dd>=0?cssVar('--t3'):cssVar('--t0');g.fillText('지난달 '+pr+'% → 이번 달 '+r.pc+'% ('+(dd>=0?'+':'')+dd+'%p)',440,y+62)}
       bar(440,y+10,380,r.pc,col(hb.tag));
       g.fillStyle=C.ink;g.font='700 30px '+F;g.textAlign='right';g.fillText(r.pc+'%'+(sk>=2?'  🔥'+sk+(hb.goal?'주':''):''),W-60,y+32);g.textAlign='left';y+=96}
     y+=20}
@@ -423,7 +424,7 @@ function monthImage(){
 const TMAX=12*3600e3; // 깜빡 켜 둔 타이머는 12시간까지만 셈
 function timerBtn(t){const on=data().timer&&data().timer.id===t.id;
   return h('button',{type:'button',class:'tmgo'+(on?' on':''),'aria-label':on?t.text+' 타이머 멈추기':t.text+' 타이머 시작',text:on?'■':'▶',on:{click:e=>{e.stopPropagation();on?stopTimer(false):startTimer(t)}}})}
-function startTimer(t){const D=data();if(D.timer)stopTimer(false,true);D.timer={id:t.id,start:Date.now()};save();render();toast('⏱ "'+t.text.slice(0,14)+'" 시작! 끝나면 ■ 를 눌러요')}
+function startTimer(t){const D=data();const r=D.timer?stopTimer(false,true):null;D.timer={id:t.id,start:Date.now()};save();render();toast((r&&r.n?'"'+r.text.slice(0,10)+'" '+hm(r.mins)+' 기록 · ':'')+'⏱ "'+t.text.slice(0,14)+'" 시작! 끝나면 ■ 를 눌러요')}
 function fmtDur(ms){const s=Math.floor(ms/1000),hh=Math.floor(s/3600),mm=Math.floor(s%3600/60),ss=s%60;return (hh?hh+':'+pad(mm):mm)+':'+pad(ss)}
 // 타이머 시간 → 날짜·10분 칸 (새벽 0~2시는 전날 24~26시 칸)
 function slotOfTime(ms){const x=new Date(ms);let hh=x.getHours(),day=ymd(x);
@@ -437,7 +438,7 @@ function stopTimer(done,quiet){
   if(t)for(const k in per){if(per[k]<5*60e3)continue;const [day,sl]=k.split('|');if(+sl>=SLOTS)continue;
     D.logs[day]=D.logs[day]||{};if(D.logs[day][sl]&&D.logs[day][sl]!==t.id){kept++;continue}D.logs[day][sl]=t.id;n++}
   if(t&&done&&!t.done){t.done=true;t.doneAt=todayS()}
-  save();render();if(quiet)return;
+  save();render();const mins0=Math.round((end-T.start)/60e3);if(quiet)return {n,mins:mins0,text:t?t.text:''};
   const mins=Math.round((end-T.start)/60e3);
   if(!t){toast('할 일이 지워져서 기록하지 않았어요');return}
   toast(n?'⏱ '+hm(mins)+' 했어요 · 10분 칸 '+n+'개에 칠했어요'+(kept?' (이미 칠한 '+kept+'칸은 그대로)':'')+(cut?' · 12시간까지만 셌어요':''):mins<5?'5분보다 짧아서 기록하지 않았어요':'이미 칠한 칸이라 그대로 뒀어요');
@@ -446,10 +447,10 @@ function tmText(T){if(!T.focus)return fmtDur(Date.now()-T.start);const left=T.st
 function timerBar(){const D=data(),T=D.timer;if(!T)return null;const t=D.tasks.find(x=>x.id===T.id);
   if(!t){delete D.timer;save();return null}
   return h('div',{class:'tmbar'+(T.focus?' focus':''),role:'status'},h('span',{class:'tmt'},T.focus?'🍅 ':'⏱ ',h('b',{text:t.text.slice(0,14)}),' ',h('span',{class:'tmc',text:tmText(T)})),
-    !T.focus?h('button',{type:'button',text:'🍅 25분',title:'25분 동안 집중하고 끝나면 알려줘요','aria-label':'25분 집중 모드로 바꾸기',on:{click:()=>{T.focus=25;T.start=Date.now();save();render();toast('🍅 25분 집중 시작! 끝나면 알려 드려요')}}}):null,
+    !T.focus?h('button',{type:'button',text:'🍅 25분',title:'25분 동안 집중하고 끝나면 알려줘요','aria-label':'25분 집중 모드로 바꾸기',on:{click:()=>{const id=T.id,r=stopTimer(false,true);data().timer={id,start:Date.now(),focus:25};save();render();toast((r&&r.n?'지금까지 '+hm(r.mins)+' 기록했어요 · ':'')+'🍅 25분 집중 시작! 끝나면 알려 드려요')}}}):null,
     h('button',{type:'button',text:'■ 그만',on:{click:()=>stopTimer(false)}}),h('button',{type:'button',class:'ok',text:'✓ 다 했어요',on:{click:()=>stopTimer(true)}}))}
 setInterval(()=>{const T=data().timer;if(!T)return;const e=document.querySelector('.tmbar .tmc');
-  if(T.focus&&Date.now()>=T.start+T.focus*60e3){stopTimer(false,true);try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(_){}toast('🍅 '+T.focus+'분 집중 끝! 10분 칸에 칠했어요. 5분 쉬어요');return}
+  if(T.focus&&Date.now()>=T.start+T.focus*60e3){const r=stopTimer(false,true);try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(_){}toast('🍅 '+T.focus+'분 집중 끝! '+(r&&r.n?'10분 칸 '+r.n+'개에 칠했어요. ':'')+'5분 쉬어요');return}
   if(e)e.textContent=tmText(T)},1000);
 // ── 기분 모아 보기 (습관 탭): 이번 달 기분, 기분 좋은 날 한 것, 1년 기분 한눈에
 const MSCORE={'😆':5,'😊':4,'🙂':4,'😐':3,'😴':3,'😔':2,'😢':1,'😠':1};
@@ -514,7 +515,7 @@ function quickList(){
 // 보여 줄 시간: 기본 6~22시, 새벽은 4시부터, 밤은 23시~새벽 2시. 기록이 있으면 넓힘
 function dayHours(ds){
   const D=data(),S=D.settings;let h0=S.early?4:6,h1=S.late?26:22;
-  for(const d of ds){for(const t of D.tasks)if(t.day===d&&t.time){const x=+t.time.slice(0,2);if(x<h0)h0=x}
+  for(const d of ds){for(const t of D.tasks)if(t.day===d&&t.time){const x=+t.time.slice(0,2);if(x<h0)h0=x;if(x>h1)h1=x}
     const L=(D.logs||{})[d]||{};for(const k in L){const x=Math.floor(+k/6);if(x<h0)h0=x;if(x>h1)h1=x}}
   return [h0,h1];
 }
@@ -634,7 +635,7 @@ function quickAdd(d){
   setTimeout(()=>ci.focus(),50);
 }
 
-const isDayItem=t=>t.src==='d'||(t.src==null&&!!t.time); // 데일리에서 적은 하루 일정 (예전 기록은 시간 있는 것)
+const isDayItem=t=>!!t.day&&(t.src==='d'||(t.src==null&&!!t.time)); // 데일리에서 적은 하루 일정 (예전 기록은 날짜+시간 있는 것). 날짜가 없으면 먼슬리·위클리 목록에 남김
 const inMonthList=t=>!t.rep&&!t.fromRep&&!isDayItem(t);
 // ── 먼슬리 (위에 달력 고정 + 아래 한 달 할 일)
 function vMonthly(){
@@ -754,7 +755,7 @@ function vDaily(){
     h('div',{class:'add'},inp,h('button',{class:'go',type:'button',text:'추가',on:{click:go}})),tagPicker(),
     h('p',{class:'hint',text:'앞에 시간을 쓰면(3시 병원) 타임라인에 들어가요.'},d!==todayS()?[' ',h('button',{type:'button',style:'color:var(--cobalt);font-weight:700',text:'오늘로 가기',on:{click:()=>{st.day=todayS();render()}}})]:null),
     !ts.length?emptyBox('이 날 할 일이 없어요. 위클리에서 요일을 누르거나 위에 바로 적어요.'):null,
-    untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 아래 계획 칸으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true,timer:d===todayS()})))]:null,
+    untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 아래 계획 칸으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true,brush:true,timer:d===todayS()})))]:null,
     h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 이미지로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:st.brush==='erase'?'🧽 지울 첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 지워져요. 꾹 누른 채 쓸어도 돼요. 다 지웠으면 ✏️ 직접 쓰기를 눌러요.':(bName?'"'+bName+'"(으)로 칠하는 중이에요. 이미 칠한 칸을 누르면 고치거나 지울 수 있어요. ':'할 일 옆 🖌를 누르면 그 일로 칠해요. 칠한 칸을 누르면 고치거나 지워요. ')+(st.brush==='erase'?'':'첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 쭉 채워져요. 꾹 누른 채 쓸어도 돼요.')}),tt,
     st.anc&&st.anc.day===d?h('div',{class:'ancbar'},h('span',null,h('b',{text:slotT(st.anc.slot)}),'부터 · 끝 칸을 눌러요'),
       h('button',{type:'button',text:'이 칸만',on:{click:()=>{const a=st.anc.slot;st.anc=null;applyRange(d,a,a)}}}),h('button',{type:'button',text:'취소',on:{click:()=>{st.anc=null;render()}}})):null,
@@ -975,7 +976,7 @@ function render(){
   const app=document.getElementById('app');
   const sx=window.scrollY,foc=document.activeElement&&document.activeElement.id;
   // 다시 그려도 적던 글자는 그대로 (카테고리를 눌러도 안 지워지게)
-  const keep={};app.querySelectorAll('input[id],textarea[id]').forEach(e=>{if(e.value)keep[e.id]=e.value});
+  const keep={};app.querySelectorAll('input[id],textarea[id]').forEach(e=>{if(e.value&&e.id!=='diary')keep[e.id]=e.value}); // 일기 칸은 날짜마다 다르니 옮기지 않음
   app.replaceChildren(...[
     demo?h('div',{class:'demo'},h('span',{text:'예시로 둘러보는 중 · 저장되지 않아요'}),h('button',{type:'button',text:'나가기',on:{click:()=>{demo=null;st.pick=null;render()}}})):null,
     timerBar(),
@@ -1061,8 +1062,8 @@ function editSheet(t){
       if(rep)detach(t)
       setDay(t,ymd(x));save();close();render();toast(md(t.day)+'로 미뤘어요')}}}):null,
     h('button',{class:'btn del',type:'button',text:rep?'이번 것만 지우기':'지우기',on:{click:()=>{
-      if(rep)rep.skip=(rep.skip||[]).concat(t.day);
-      D.tasks.splice(D.tasks.indexOf(t),1);save();close();render();toast('지웠어요')}}}),
+      const u=snap(t),skip0=rep?(rep.skip||[]).slice():null;if(rep)rep.skip=(rep.skip||[]).concat(t.day);
+      D.tasks.splice(D.tasks.indexOf(t),1);save();close();render();toast('지웠어요',()=>{if(rep)rep.skip=skip0;u()})}}}),
     rep?h('button',{class:'btn del',type:'button',text:'반복 그만하기 (오늘 이후 것 지우기)',on:{click:()=>stopRep(rep,close)}}):null);
 }
 function stopRep(rep,close){
@@ -1438,7 +1439,7 @@ function importData(o){
     out.tasks.push({id:t.id,text,tag:Number.isInteger(t.tag)&&t.tag>=0&&t.tag<8?t.tag:null,rep:okId(t.rep)?t.rep:null,
       month:typeof t.month==='string'&&/^\d{4}-\d\d$/.test(t.month)?t.month:mkOf(todayS()),week:Number.isInteger(t.week)&&t.week>=0&&t.week<6?t.week:null,
       day:isDate(t.day)?t.day:null,time:isTime(t.time)?t.time:null,done:t.done===true,doneAt:t.done===true&&isDate(t.doneAt)?t.doneAt:null,
-      ord:Number.isFinite(t.ord)?t.ord:undefined})}
+      ord:Number.isFinite(t.ord)?t.ord:undefined,src:['d','m','w'].includes(t.src)?t.src:undefined,fromRep:okId(t.fromRep)?t.fromRep:undefined,autoDone:t.autoDone===true&&t.done===true?true:undefined})}
   for(const r of (Array.isArray(d.reps)?d.reps:[]).slice(0,500)){if(!r||!okId(r.id))continue;
     const text=cleanStr(r.text,200).trim();if(!text||(r.type!=='week'&&r.type!=='month'&&r.type!=='nthM'))continue;
     const dows=Array.isArray(r.dows)?[...new Set(r.dows.filter(x=>Number.isInteger(x)&&x>=0&&x<7))]:[];
