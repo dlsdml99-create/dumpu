@@ -22,6 +22,8 @@ public class AlarmReceiver extends BroadcastReceiver {
     static final String ACTION_MORNING = "io.github.dlsdml99create.dumpu.MORNING";
     static final String ACTION_HOURLY = "io.github.dlsdml99create.dumpu.HOURLY";
     static final String ACTION_HABIT = "io.github.dlsdml99create.dumpu.HABIT";
+    static final String ACTION_TASK = "io.github.dlsdml99create.dumpu.TASK";
+    private static final String CH_TASK = "task";
     private static final String CH = "morning";
     private static final String CH_HOUR = "hourly";
     private static final String CH_HAB = "habit";
@@ -36,6 +38,8 @@ public class AlarmReceiver extends BroadcastReceiver {
             notifyHour(c);
         } else if (ACTION_HABIT.equals(a)) {
             notifyHabits(c);
+        } else if (ACTION_TASK.equals(a)) {
+            notifyTasks(c);
         }
         // 부팅·업데이트 후, 알림을 울린 뒤 모두 다음 알림을 다시 잡는다
         schedule(c);
@@ -55,6 +59,68 @@ public class AlarmReceiver extends BroadcastReceiver {
         scheduleHourly(c);
         scheduleMorning(c);
         scheduleHabit(c);
+        scheduleTask(c);
+    }
+
+    private static PendingIntent piTask(Context c) {
+        Intent i = new Intent(c, AlarmReceiver.class).setAction(ACTION_TASK);
+        return PendingIntent.getBroadcast(c, 12, i, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+
+    /** 할 일 시간 알림·25분 집중 끝: 앱이 미리 계산한 시각(at) 중 가장 빠른 것 하나를 잡는다. */
+    static void scheduleTask(Context c) {
+        AlarmManager am = (AlarmManager) c.getSystemService(Context.ALARM_SERVICE);
+        if (am == null) return;
+        am.cancel(piTask(c));
+        JSONArray rem = Store.snapshot(c).optJSONArray("rem");
+        if (rem == null) return;
+        long now = System.currentTimeMillis(), best = Long.MAX_VALUE;
+        for (int i = 0; i < rem.length() && i < 80; i++) {
+            JSONObject o = rem.optJSONObject(i);
+            if (o == null) continue;
+            long at = o.optLong("at", 0);
+            if (at > now + 1000 && at < best) best = at;
+        }
+        if (best != Long.MAX_VALUE) am.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, best, piTask(c));
+    }
+
+    /** 지금(±2분) 울릴 할 일 알림을 보낸다. 글은 앱이 만든 것을 그대로 쓴다. */
+    private static void notifyTasks(Context c) {
+        if (Build.VERSION.SDK_INT >= 33
+                && c.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return;
+        JSONArray rem = Store.snapshot(c).optJSONArray("rem");
+        if (rem == null) return;
+        NotificationManager nm = (NotificationManager) c.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (nm == null) return;
+        if (Build.VERSION.SDK_INT >= 26) {
+            nm.createNotificationChannel(new NotificationChannel(CH_TASK, "할 일 시간 알림", NotificationManager.IMPORTANCE_HIGH));
+        }
+        Intent open = new Intent(c, MainActivity.class).putExtra("open", "daily")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        PendingIntent pi = PendingIntent.getActivity(c, 4, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        long now = System.currentTimeMillis();
+        // 폰이 절전 중이면 알림이 몇 분 늦게 깨울 수 있어서, 20분 안에 지난 것까지 한 번씩만 보낸다
+        android.content.SharedPreferences sp = c.getSharedPreferences("dumpu_rem", Context.MODE_PRIVATE);
+        java.util.Set<String> sent = new java.util.HashSet<>(sp.getStringSet("sent", new java.util.HashSet<>()));
+        java.util.Set<String> keep = new java.util.HashSet<>();
+        for (String k : sent) { try { if (Long.parseLong(k.substring(k.lastIndexOf('@') + 1)) > now - 86400000L) keep.add(k); } catch (Exception ignored) { } }
+        for (int i = 0; i < rem.length() && i < 80; i++) {
+            JSONObject o = rem.optJSONObject(i);
+            if (o == null) continue;
+            long at = o.optLong("at", 0);
+            if (at > now + 120000 || at < now - 1200000) continue;
+            String key = o.optString("id") + "@" + at;
+            if (keep.contains(key)) continue;
+            keep.add(key);
+            String text = o.optString("t");
+            if (text.length() > 120) text = text.substring(0, 120);
+            Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(c, CH_TASK) : new Notification.Builder(c);
+            b.setSmallIcon(R.drawable.ic_noti).setContentTitle("덤푸").setContentText(text)
+                    .setStyle(new Notification.BigTextStyle().bigText(text))
+                    .setAutoCancel(true).setContentIntent(pi);
+            nm.notify(400 + (o.optString("id").hashCode() & 0xffff), b.build());
+        }
+        sp.edit().putStringSet("sent", keep).apply();
     }
 
     private static PendingIntent piHabit(Context c) {

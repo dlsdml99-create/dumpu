@@ -14,7 +14,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 const isDate=s=>{if(typeof s!=='string'||!/^\d{4}-\d\d-\d\d$/.test(s))return false;const d=parse(s);return ymd(d)===s&&d.getFullYear()>=2000&&d.getFullYear()<=2100};
 const isTime=s=>typeof s==='string'&&/^([01]\d|2[0-3]):[0-5]\d$/.test(s);
 const MOODS=['😆','😊','🙂','😐','😔','😢','😠','😴']; // 오늘 기분
-const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},diary:{},habits:[],hchk:{},hnote:{},settings:{alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
+const blank=()=>({tasks:[],reps:[],annivs:[],logs:{},ents:{},diary:{},habits:[],hchk:{},hnote:{},settings:{remind:10,alarm:false,time:'08:00',tags:['회사','집','약속'],tagColor:[4,2,0],hol:true,early:false,late:false,hourly:false,hFrom:9,hTo:22,palV:2}});
 
 // ── 공휴일 (한국천문연구원 월력요항·정부 발표 기준, 2026~2028)
 const HOL={
@@ -69,6 +69,7 @@ if(!real.hnote||typeof real.hnote!=='object'||Array.isArray(real.hnote))real.hno
 if(!real.mood||typeof real.mood!=='object'||Array.isArray(real.mood))real.mood={};
 for(const k in real.mood)if(!isDate(k)||!MOODS.includes(real.mood[k]))delete real.mood[k];
 if(real.timer&&!(real.timer&&typeof real.timer.id==='string'&&Number.isFinite(real.timer.start)&&real.timer.start<=Date.now()))delete real.timer;
+if(real.timer&&real.timer.focus!=null&&real.timer.focus!==25)delete real.timer.focus;
 {const S=real.settings;if(!Array.isArray(S.tags)||!S.tags.length)S.tags=['회사','집','약속'];S.tags=S.tags.slice(0,8);
  if(!Array.isArray(S.tagColor))S.tagColor=[];S.tags.forEach((_,i)=>{if(!(S.tagColor[i]>=0&&S.tagColor[i]<8))S.tagColor[i]=i%8});S.tagColor.length=S.tags.length
  if(S.palV!==2){const MAP=[4,3,1,6,5,2,3,7];S.tagColor=S.tagColor.map(o=>MAP[o]);S.palV=2} // 예전 색(파랑·청록·주황·분홍·보라·노랑·초록·회색) → 가장 비슷한 새 색
@@ -90,7 +91,15 @@ function syncNative(){
     for(let hh=0;hh<24;hh++){let n=0;for(let k=0;k<6;k++)if(L[hh*6+k])n++;if(n>=3)filled.push(hh)} // 반 이상 적은 시간은 안 물어봄
     const S=real.settings;
     const hab=real.habits.filter(x=>!x.arch&&x.time).map(x=>({id:x.id,text:(x.icon?x.icon+' ':'')+x.name.slice(0,20),time:x.time,dows:x.goal?[]:(x.dows||[]),pauses:x.pauses||[],met:!!x.goal&&weekCount(x,t0s)>=x.goal}));
-    B.sync(JSON.stringify({days,alarm:!!S.alarm,time:S.time,hourly:!!S.hourly,hFrom:S.hFrom|0,hTo:S.hTo|0,filledDay:t0,filled,hab}));
+    // 할 일 시간 알림 (앞으로 2주, 끝내지 않은 일) + 25분 집중 끝 알림. 울릴 시각(ms)과 글을 미리 만들어 넘김
+    const rem=[],now=Date.now(),R=[-1,0,10,30,60].includes(S.remind)?S.remind:10;
+    if(R>=0)for(const t of real.tasks){if(t.done||!t.time||!isDate(t.day)||!isTime(t.time))continue;
+      const [hh,mm]=t.time.split(':').map(Number),at=parse(t.day).getTime()+(hh*60+mm-R)*60e3;
+      if(at>now&&at<now+15*864e5)rem.push({id:t.id,at,t:'⏰ '+t.time+' '+t.text.slice(0,40)+(R?' · '+(R===60?'1시간':R+'분')+' 뒤예요':' · 지금 할 시간이에요')})}
+    rem.sort((a,b)=>a.at-b.at);rem.length=Math.min(rem.length,60);
+    const T=real.timer;if(T&&T.focus){const t=real.tasks.find(x=>x.id===T.id);const at=T.start+T.focus*60e3;if(at>now)rem.unshift({id:'focus',at,t:'🍅 '+T.focus+'분 집중 끝! '+(t?'"'+t.text.slice(0,20)+'" ':'')+'5분 쉬어요'})}
+    if(rem.length&&!S.remAsked&&!demo){S.remAsked=true;try{localStorage.setItem(KEY,JSON.stringify(real))}catch(e){}B.requestNoti()}
+    B.sync(JSON.stringify({days,alarm:!!S.alarm,time:S.time,hourly:!!S.hourly,hFrom:S.hFrom|0,hTo:S.hTo|0,filledDay:t0,filled,hab,rem}));
   }catch(e){}
 }
 // 위젯에서 체크한 것을 앱 데이터에 반영
@@ -257,7 +266,7 @@ const COLORS=['빨강','주황','노랑','초록','파랑','보라','분홍','�
 function taskRow(t,extra,opt){
   const tags=[];
   if(t.done)tags.push(h('span',{class:'tag',text:md(t.doneAt)+' 완료'}));
-  else if(isLate(t))tags.push(h('span',{class:'tag late',text:'밀림 '+md(dueEnd(t))}));
+  else if(isLate(t))tags.push(h('span',{class:'tag late',text:'밀린 일 · '+md(dueEnd(t))}));
   else if(t.day&&!(opt&&opt.noDay))tags.push(h('span',{class:'tag day',text:md(t.day)}));
   const pickB=opt&&opt.brush;
   return h('div',{class:'row'+(t.done?' done':'')+(hasTag(t)?' g'+colOf(t.tag):'')+(pickB&&st.brush===t.id?' brushing':''),'data-tid':t.id,'data-drop':opt&&opt.drop?'before:'+t.id:null},
@@ -421,7 +430,7 @@ function slotOfTime(ms){const x=new Date(ms);let hh=x.getHours(),day=ymd(x);
   return {day,slot:hh*6+Math.floor(x.getMinutes()/10)}}
 function stopTimer(done,quiet){
   const D=data(),T=D.timer;if(!T)return;delete D.timer;
-  const t=D.tasks.find(x=>x.id===T.id);let end=Date.now();const cut=end-T.start>TMAX;if(cut)end=T.start+TMAX;
+  const t=D.tasks.find(x=>x.id===T.id);let end=Date.now();if(T.focus)end=Math.min(end,T.start+T.focus*60e3);const cut=end-T.start>TMAX;if(cut)end=T.start+TMAX;
   const per={};for(let m=T.start;m<end;m+=60e3){const o=slotOfTime(m),k=o.day+'|'+o.slot;per[k]=(per[k]||0)+Math.min(60e3,end-m)}
   let n=0,kept=0;
   if(t)for(const k in per){if(per[k]<5*60e3)continue;const [day,sl]=k.split('|');if(+sl>=SLOTS)continue;
@@ -432,11 +441,36 @@ function stopTimer(done,quiet){
   if(!t){toast('할 일이 지워져서 기록하지 않았어요');return}
   toast(n?'⏱ '+hm(mins)+' 했어요 · 10분 칸 '+n+'개에 칠했어요'+(kept?' (이미 칠한 '+kept+'칸은 그대로)':'')+(cut?' · 12시간까지만 셌어요':''):mins<5?'5분보다 짧아서 기록하지 않았어요':'이미 칠한 칸이라 그대로 뒀어요');
 }
+function tmText(T){if(!T.focus)return fmtDur(Date.now()-T.start);const left=T.start+T.focus*60e3-Date.now();return left>0?fmtDur(left+999)+' 남음':'끝!'}
 function timerBar(){const D=data(),T=D.timer;if(!T)return null;const t=D.tasks.find(x=>x.id===T.id);
   if(!t){delete D.timer;save();return null}
-  return h('div',{class:'tmbar',role:'status'},h('span',{class:'tmt'},'⏱ ',h('b',{text:t.text.slice(0,16)}),' ',h('span',{class:'tmc',text:fmtDur(Date.now()-T.start)})),
+  return h('div',{class:'tmbar'+(T.focus?' focus':''),role:'status'},h('span',{class:'tmt'},T.focus?'🍅 ':'⏱ ',h('b',{text:t.text.slice(0,14)}),' ',h('span',{class:'tmc',text:tmText(T)})),
+    !T.focus?h('button',{type:'button',text:'🍅 25분',title:'25분 동안 집중하고 끝나면 알려줘요','aria-label':'25분 집중 모드로 바꾸기',on:{click:()=>{T.focus=25;T.start=Date.now();save();render();toast('🍅 25분 집중 시작! 끝나면 알려 드려요')}}}):null,
     h('button',{type:'button',text:'■ 그만',on:{click:()=>stopTimer(false)}}),h('button',{type:'button',class:'ok',text:'✓ 다 했어요',on:{click:()=>stopTimer(true)}}))}
-setInterval(()=>{const T=data().timer,e=document.querySelector('.tmbar .tmc');if(T&&e)e.textContent=fmtDur(Date.now()-T.start)},1000);
+setInterval(()=>{const T=data().timer;if(!T)return;const e=document.querySelector('.tmbar .tmc');
+  if(T.focus&&Date.now()>=T.start+T.focus*60e3){stopTimer(false,true);try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(_){}toast('🍅 '+T.focus+'분 집중 끝! 10분 칸에 칠했어요. 5분 쉬어요');return}
+  if(e)e.textContent=tmText(T)},1000);
+// ── 기분 모아 보기 (습관 탭): 이번 달 기분, 기분 좋은 날 한 것, 1년 기분 한눈에
+const MSCORE={'😆':5,'😊':4,'🙂':4,'😐':3,'😴':3,'😔':2,'😢':1,'😠':1};
+function moodBox(){
+  const D=data(),M=D.mood||{},keys=Object.keys(M);if(!keys.length)return h('div',{class:'rbox'},h('b',{text:'기분'}),h('p',{class:'hint',style:'margin:4px 0 0',text:'데일리 맨 아래 "오늘의 한 줄"에서 기분을 고르면, 여기서 기분 좋은 날 무엇을 했는지 보여드려요.'}));
+  const mk=mKey(),mon=keys.filter(k=>k.slice(0,7)===mk),cnt={};mon.forEach(k=>cnt[M[k]]=(cnt[M[k]]||0)+1);
+  // 습관을 한 날 vs 안 한 날의 '기분 좋은 날' 비율 (최근 90일, 기분을 고른 날만)
+  const t0=todayS(),cut=ymd(new Date(parse(t0).getTime()-90*864e5)),days=keys.filter(k=>k>=cut&&k<=t0);
+  const good=k=>MSCORE[M[k]]>=4,finds=[];
+  for(const hb of activeHabits()){const on=days.filter(k=>habitOn(hb,k));const a=on.filter(k=>habitDone(hb,k)),b=on.filter(k=>!habitDone(hb,k));
+    if(a.length<3||b.length<3)continue;const pa=Math.round(a.filter(good).length/a.length*100),pb=Math.round(b.filter(good).length/b.length*100);
+    if(pa-pb>=20)finds.push({hb,pa,pb,d:pa-pb})}
+  finds.sort((x,y)=>y.d-x.d);
+  // 1년 기분 한눈에 (월 12줄 × 날짜)
+  const y=st.y,grid=h('div',{class:'ypx','aria-label':y+'년 기분 한눈에'});
+  for(let m=0;m<12;m++){const row=h('div',{class:'ypr'},h('span',{class:'ypm',text:(m+1)+''}));const last=new Date(y,m+1,0).getDate();
+    for(let d=1;d<=31;d++){const k=y+'-'+pad(m+1)+'-'+pad(d),v=M[k];row.append(h('i',{class:d>last?'x':v?'s'+MSCORE[v]:'',title:v?md(k)+' '+v:null}))}grid.append(row)}
+  return h('div',{class:'rbox'},h('b',{text:(st.m+1)+'월 기분'}),
+    mon.length?h('p',{class:'mcnt'},MOODS.filter(m=>cnt[m]).map(m=>h('span',{text:m+' '+cnt[m]+'일'}))):h('p',{class:'hint',style:'margin:4px 0',text:'이번 달은 아직 고른 기분이 없어요.'}),
+    finds.length?finds.slice(0,3).map(f=>h('p',{class:'mfind'},h('b',{text:hbMark(f.hb)+' '+f.hb.name}),' 한 날은 기분 좋은 날이 '+f.pa+'%, 안 한 날은 '+f.pb+'%예요')):days.length>=14?h('p',{class:'hint',style:'margin:4px 0',text:'아직 기분과 크게 이어진 습관이 보이지 않아요. 더 쌓이면 알려드려요.'}):h('p',{class:'hint',style:'margin:4px 0',text:'기분을 2주 넘게 고르면, 기분 좋은 날 어떤 습관을 했는지 알려드려요.'}),
+    h('div',{class:'sec',style:'margin-top:10px',text:y+'년 기분 한눈에'}),grid,
+    h('p',{class:'ypl'},h('i',{class:'s5'}),'아주 좋음 ',h('i',{class:'s4'}),'좋음 ',h('i',{class:'s3'}),'보통 ',h('i',{class:'s2'}),'안 좋음 ',h('i',{class:'s1'}),'힘듦'))}
 // 오늘 기분 (한 줄 일기 위)
 function moodRow(d){const D=data();D.mood=D.mood||{};const cur=D.mood[d];
   return h('div',{class:'moods',role:'group','aria-label':'오늘 기분'},MOODS.map(m=>h('button',{type:'button',class:'mood'+(cur===m?' on':''),'aria-pressed':cur===m?'true':'false',text:m,
@@ -816,6 +850,7 @@ function vHabit(){
       const pm=prevMonthDays(),pr=pm.some(d=>habitDone(hb,d))?habitRate(hb,pm).pc:null;
       return h('div',{class:'rrow2'},h('div',{class:'rrow'},h('span',{class:'rn tc'+cls,text:(hb.icon?hb.icon+' ':'')+hb.name.slice(0,10)}),h('span',{class:'rbar'},h('i',{class:'c'+cls,style:'width:'+r.pc+'%'})),h('span',{class:'rp',text:r.pc+'%'+(streak>=2?' 🔥'+streak+(hb.goal?'주':''):'')})),
         h('small',{class:'rsub',text:(hb.goal?'주 '+hb.goal+'번 목표 · ':habitDays(hb)+' · ')+(hb.time?'⏰'+hb.time+' · ':'')+r.n+'번 했어요'+diffTxt(r.pc,pr)}))})):null,
+    moodBox(),
     H.length?h('button',{type:'button',class:'btn',style:'margin:8px 0',text:'🖼 이번 달 돌아보기 이미지',on:{click:()=>monthImage()}}):null,
     ARCH.length?[h('div',{class:'sec',text:'보관한 습관 '+ARCH.length+' · 기록은 그대로 남아요'}),h('div',{class:'list'},ARCH.map(hb=>{const n=Object.values(D.hchk||{}).filter(a=>a.includes(hb.id)).length;
       return h('div',{class:'row'},h('div',{class:'top'},h('span',{class:'txt',text:(hb.icon?hb.icon+' ':'')+hb.name+' · '+n+'번 했어요'}),
@@ -1087,6 +1122,9 @@ function settingsSheet(){
       h('div',{class:'sec',text:'아침 알림'}),
       h('div',{class:'set'},h('span',null,'매일 아침 오늘 할 일 알려주기',h('small',{text:B?'정한 시간에 오늘 할 일을 알려줘요':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'})),sw),
       S.alarm?h('div',{class:'set'},h('span',{text:'알림 시간'}),tm):null,preview,
+      h('div',{class:'sec',text:'할 일 시간 알림'}),
+      h('div',{class:'set'},h('span',null,'"3시 병원"처럼 시간을 정한 할 일',h('small',{text:B?'정한 때에 알려줘요. 끝낸 일은 알리지 않아요.':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'}))),
+      h('div',{class:'chips',style:'padding-left:0;margin-bottom:6px'},[[-1,'끄기'],[0,'정각에'],[10,'10분 전'],[30,'30분 전'],[60,'1시간 전']].map(([v,l])=>h('button',{type:'button',class:'chip'+(((S.remind??10)===v)?' on':''),text:l,'aria-pressed':((S.remind??10)===v)?'true':'false',on:{click:()=>{S.remind=v;if(v>=0&&B&&!demo)B.requestNoti();save();draw()}}}))),
       h('div',{class:'sec',text:'매시간 기록 알림'}),
       h('div',{class:'set'},h('span',null,'"지난 1시간 뭐 했어요?" 알림',h('small',{text:B?'정한 시간 동안 매시 정각쯤 알려줘요. 이미 적은 시간은 건너뛰어요.':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'})),
         h('button',{type:'button',class:'sw'+(S.hourly?' on':''),'aria-label':'매시간 기록 알림',on:{click:()=>{S.hourly=!S.hourly;if(S.hourly&&B&&!demo)B.requestNoti();save();draw()}}})),
@@ -1410,6 +1448,7 @@ function importData(o){
       x.rule=y}
     if(a.lunar===true&&Number.isInteger(a.lm)&&a.lm>=1&&a.lm<=12&&Number.isInteger(a.ld)&&a.ld>=1&&a.ld<=30){x.lunar=true;x.lm=a.lm;x.ld=a.ld}
     out.annivs.push(x)}
+  if(d.mood&&typeof d.mood==='object'&&!Array.isArray(d.mood)){for(const k in d.mood){if(isDate(k)&&MOODS.includes(d.mood[k]))out.mood[k]=d.mood[k]}}
   if(d.diary&&typeof d.diary==='object'&&!Array.isArray(d.diary)){let n=0;for(const k in d.diary){if(!isDate(k)||++n>20000)continue;const v=cleanStr(d.diary[k],200).trim();if(v)out.diary[k]=v}}
   if(d.logs&&typeof d.logs==='object'&&!Array.isArray(d.logs)){let n=0;
     for(const day in d.logs){if(!isDate(day)||++n>5000)continue;const v=d.logs[day];if(!v||typeof v!=='object')continue;const o={};
@@ -1429,7 +1468,7 @@ function importData(o){
     for(const k in d.hnote){if(!isDate(k)||++n>20000)continue;const v=d.hnote[k];if(!v||typeof v!=='object')continue;const o={};
       for(const id in v){if(ids.has(id)){const t=cleanStr(v[id],40).trim();if(t)o[id]=t}}if(Object.keys(o).length)out.hnote[k]=o}}
   const S=d.settings||{};
-  out.settings.alarm=S.alarm===true;out.settings.time=isTime(S.time)?S.time:'08:00';out.settings.hol=S.hol!==false;out.settings.early=S.early===true;out.settings.late=S.late===true;out.settings.palV=2;out.settings.hourly=S.hourly===true;out.settings.hFrom=Number.isInteger(S.hFrom)&&S.hFrom>=0&&S.hFrom<24?S.hFrom:9;out.settings.hTo=Number.isInteger(S.hTo)&&S.hTo>=0&&S.hTo<24?S.hTo:22;
+  out.settings.alarm=S.alarm===true;out.settings.time=isTime(S.time)?S.time:'08:00';out.settings.hol=S.hol!==false;out.settings.early=S.early===true;out.settings.late=S.late===true;out.settings.palV=2;out.settings.remind=[-1,0,10,30,60].includes(S.remind)?S.remind:10;out.settings.hourly=S.hourly===true;out.settings.hFrom=Number.isInteger(S.hFrom)&&S.hFrom>=0&&S.hFrom<24?S.hFrom:9;out.settings.hTo=Number.isInteger(S.hTo)&&S.hTo>=0&&S.hTo<24?S.hTo:22;
   if(Array.isArray(S.tags)&&S.tags.length){out.settings.tags=S.tags.slice(0,8).map((x,i)=>cleanStr(x,8).trim()||('카테고리'+(i+1)))}
   out.settings.tagColor=out.settings.tags.map((_,i)=>Array.isArray(S.tagColor)&&Number.isInteger(S.tagColor[i])&&S.tagColor[i]>=0&&S.tagColor[i]<8?S.tagColor[i]:i%8);
   if(S.palV!==2){const MAP=[4,3,1,6,5,2,3,7];out.settings.tagColor=out.settings.tagColor.map(o=>MAP[o])}
