@@ -256,7 +256,7 @@ function addTasks(text,extra){
     data().tasks.push(Object.assign({id:uid(),text:p.text,tag:st.addTag,rep:null,month:mKey(),week:null,day:null,time:p.time,done:false,doneAt:null},extra||{}))}
   save();return lines.length;
 }
-function toggle(t){const u=snap(t);t.done=!t.done;t.doneAt=t.done?todayS():null;save();rerender();toast(t.done?md(t.doneAt)+' 완료로 기록했어요':'완료를 취소했어요',u)}
+function toggle(t){const u=snap(t);delete t.autoDone;t.done=!t.done;t.doneAt=t.done?todayS():null;save();rerender();toast(t.done?md(t.doneAt)+' 완료로 기록했어요':'완료를 취소했어요',u)}
 const tagName=i=>data().settings.tags[i];
 const tagIdx=()=>data().settings.tags.map((_,i)=>i);
 const colOf=i=>{const c=data().settings.tagColor;return c&&c[i]!=null?c[i]:i%8};
@@ -270,8 +270,9 @@ function taskRow(t,extra,opt){
   else if(t.day&&!(opt&&opt.noDay))tags.push(h('span',{class:'tag day',text:md(t.day)}));
   const pickB=opt&&opt.brush;
   return h('div',{class:'row'+(t.done?' done':'')+(hasTag(t)?' g'+colOf(t.tag):'')+(pickB&&st.brush===t.id?' brushing':''),'data-tid':t.id,'data-drop':opt&&opt.drop?'before:'+t.id:null},
-    h('div',{class:'top'},h('button',{class:'txt',type:'button','aria-pressed':t.done?'true':'false','aria-label':t.text+(t.done?' (완료)':'')+(pickB?' · 누르면 이 일로 칠하기, 길게 누르면 고치기':' · 누르면 줄 긋기, 길게 누르면 고치기'),on:{click:()=>{if(pickB){st.brush=st.brush===t.id?null:t.id;render();if(st.brush)toast('"'+t.text.slice(0,10)+'" 칠하기 · 오른쪽 칸을 톡톡 눌러요')}else toggle(t)},contextmenu:e=>{e.preventDefault();if(DR.on||Date.now()<DR.until)return;editSheet(t)}}},
+    h('div',{class:'top'},h('button',{class:'txt',type:'button','aria-pressed':t.done?'true':'false','aria-label':t.text+(t.done?' (완료)':'')+' · 누르면 줄 긋기(완료), 다시 누르면 취소, 길게 누르면 고치기',on:{click:()=>toggle(t),contextmenu:e=>{e.preventDefault();if(DR.on||Date.now()<DR.until)return;editSheet(t)}}},
       t.time&&!(opt&&opt.noTime)?h('span',{class:'tm',text:t.time}):null,t.text,t.rep?h('span',{class:'rp',text:'↻'}):null),tags,
+      pickB?h('button',{type:'button',class:'brbtn'+(st.brush===t.id?' on':''),'aria-label':st.brush===t.id?t.text+' 칠하기 그만':t.text+'(으)로 10분 칸 칠하기','aria-pressed':st.brush===t.id?'true':'false',text:'🖌',on:{click:e=>{e.stopPropagation();st.brush=st.brush===t.id?null:t.id;render();if(st.brush)toast('"'+t.text.slice(0,10)+'"(으)로 칠해요 · 오른쪽 칸을 톡톡 눌러요')}}}):null,
       opt&&opt.timer&&!t.done?timerBtn(t):null),extra||null);
 }
 function timeChip(t){return h('button',{type:'button',class:'chip'+(t.time?' on':''),text:t.time?'⏰ '+t.time:'⏰ 시간',on:{click:()=>timeSheet(t)}})}
@@ -754,7 +755,7 @@ function vDaily(){
     h('p',{class:'hint',text:'앞에 시간을 쓰면(3시 병원) 타임라인에 들어가요.'},d!==todayS()?[' ',h('button',{type:'button',style:'color:var(--cobalt);font-weight:700',text:'오늘로 가기',on:{click:()=>{st.day=todayS();render()}}})]:null),
     !ts.length?emptyBox('이 날 할 일이 없어요. 위클리에서 요일을 누르거나 위에 바로 적어요.'):null,
     untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 아래 계획 칸으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true,timer:d===todayS()})))]:null,
-    h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 이미지로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:st.brush==='erase'?'🧽 지울 첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 지워져요. 꾹 누른 채 쓸어도 돼요. 다 지웠으면 ✏️ 직접 쓰기를 눌러요.':(bName?'"'+bName+'"(으)로 칠하는 중이에요. 이미 칠한 칸을 누르면 고치거나 지울 수 있어요. ':'왼쪽 계획의 할 일을 누르면 그 일로 칠해요. 칠한 칸을 누르면 고치거나 지워요. ')+(st.brush==='erase'?'':'첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 쭉 채워져요. 꾹 누른 채 쓸어도 돼요.')}),tt,
+    h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 이미지로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:st.brush==='erase'?'🧽 지울 첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 지워져요. 꾹 누른 채 쓸어도 돼요. 다 지웠으면 ✏️ 직접 쓰기를 눌러요.':(bName?'"'+bName+'"(으)로 칠하는 중이에요. 이미 칠한 칸을 누르면 고치거나 지울 수 있어요. ':'할 일 옆 🖌를 누르면 그 일로 칠해요. 칠한 칸을 누르면 고치거나 지워요. ')+(st.brush==='erase'?'':'첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 쭉 채워져요. 꾹 누른 채 쓸어도 돼요.')}),tt,
     st.anc&&st.anc.day===d?h('div',{class:'ancbar'},h('span',null,h('b',{text:slotT(st.anc.slot)}),'부터 · 끝 칸을 눌러요'),
       h('button',{type:'button',text:'이 칸만',on:{click:()=>{const a=st.anc.slot;st.anc=null;applyRange(d,a,a)}}}),h('button',{type:'button',text:'취소',on:{click:()=>{st.anc=null;render()}}})):null,
     sum,
@@ -1362,10 +1363,14 @@ function finishPaint(){
     if(lo===hi&&L[lo])editRun(PT.day,lo);else writeSheet(PT.day,lo,hi);
     return}
   // 할 일로 칠하면 그 일은 한 것으로 (줄 긋기)
-  if(PT.mode==='paint'&&PT.val&&!PT.val.startsWith('e:')){const t=D.tasks.find(x=>x.id===PT.val);if(t&&!t.done){t.done=true;t.doneAt=PT.day}}
+  if(PT.mode==='paint'&&PT.val&&!PT.val.startsWith('e:')){const t=D.tasks.find(x=>x.id===PT.val);if(t&&!t.done){t.done=true;t.doneAt=PT.day;t.autoDone=true}}
   if(D.logs[PT.day]&&!Object.keys(D.logs[PT.day]).length)delete D.logs[PT.day];
+  if(PT.mode==='erase')undoAutoDone();
   pruneEnts();save();render();
 }
+// 칠해서 저절로 완료된 할 일은, 칠한 칸을 모두 지우면 다시 안 한 일로 (Jane 의견: 실수로 칠했다 지워도 완료가 남던 문제)
+function undoAutoDone(){const D=data(),used=new Set();for(const d in D.logs)for(const k in D.logs[d])used.add(D.logs[d][k]);
+  for(const t of D.tasks)if(t.autoDone&&t.done&&!used.has(t.id)){t.done=false;t.doneAt=null;delete t.autoDone}}
 // 어디에도 안 쓰는 직접 쓴 기록은 지움
 function pruneEnts(){const D=data(),used=new Set();for(const d in D.logs)for(const k in D.logs[d]){const v=D.logs[d][k];if(v.startsWith('e:'))used.add(v.slice(2))}
   for(const id in ents())if(!used.has(id))delete ents()[id]}
@@ -1380,7 +1385,7 @@ function writeSheet(day,lo,hi,entId){
   const go=()=>{let v=ti.value.trim().slice(0,30);if(!v&&tag!=null)v=tagName(tag);if(!v){toast('무엇을 했는지 적어 주세요');return}
     const D=data();
     if(!entId){const tk=D.tasks.find(x=>x.day===day&&x.text.trim().toLowerCase()===v.toLowerCase());
-      if(tk){D.logs[day]=D.logs[day]||{};for(let n=lo;n<=hi;n++)D.logs[day][n]=tk.id;if(!tk.done){tk.done=true;tk.doneAt=day}
+      if(tk){D.logs[day]=D.logs[day]||{};for(let n=lo;n<=hi;n++)D.logs[day][n]=tk.id;if(!tk.done){tk.done=true;tk.doneAt=day;tk.autoDone=true}
         pruneEnts();save();close();render();toast(slotT(lo)+'~'+slotT(hi+1)+' '+tk.text+' (계획한 일로 칠했어요)');return}}
     const id=entId||uid();ents()[id]={text:v,tag:tag==null?null:tag};
     D.logs[day]=D.logs[day]||{};for(let n=lo;n<=hi;n++)D.logs[day][n]='e:'+id;
@@ -1399,7 +1404,7 @@ function editRun(day,slot){
   const [a,b]=runOf(L,slot);
   if(it.kind==='e'){writeSheet(day,a,b,it.id);return}
   const close=sheet(h('h3',{text:it.text}),h('p',{text:slotT(a)+' ~ '+slotT(b+1)+' ('+(b-a+1)*10+'분) 동안 했어요'}),
-    h('button',{class:'btn del',type:'button',text:'이 시간 지우기',on:{click:()=>{for(let n=a;n<=b;n++)delete L[n];if(!Object.keys(L).length)delete data().logs[day];save();close();render();toast('지웠어요')}}}),
+    h('button',{class:'btn del',type:'button',text:'이 시간 지우기',on:{click:()=>{for(let n=a;n<=b;n++)delete L[n];if(!Object.keys(L).length)delete data().logs[day];undoAutoDone();save();close();render();toast('지웠어요')}}}),
     h('button',{class:'btn',type:'button',text:'할 일 고치기',on:{click:()=>{close();editSheet(it.t)}}}));
 }
 document.addEventListener('touchstart',paintStart,{passive:true});

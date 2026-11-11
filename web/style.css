@@ -415,3 +415,8 @@ body.painting{-webkit-user-select:none;user-select:none}
 .upd-row{display:flex;justify-content:flex-end;gap:18px;margin-top:14px}
 .upd-row button{padding:10px 6px;font-weight:800;font-size:15px;color:var(--cobalt)}
 .upd-row .upd-later{color:var(--muted)}
+
+/* v2.8 칠하기 버튼 (할 일을 누르면 완료, 🖌를 누르면 칠하기) */
+.brbtn{flex:none;width:30px;height:30px;border-radius:50%;background:var(--card);border:1.5px solid var(--line);font-size:14px;display:inline-flex;align-items:center;justify-content:center;margin-left:auto}
+.brbtn.on{border-color:var(--cobalt);background:var(--cobalt)}
+.brbtn+.tmgo{margin-left:6px}
