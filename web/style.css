@@ -427,3 +427,12 @@ body.painting{-webkit-user-select:none;user-select:none}
 .tt-p .row .tm{white-space:nowrap}
 @media (max-width:380px){.tt-r{grid-template-columns:minmax(0,1fr) 22px minmax(120px,42%)}
   .tt-p .row .top{flex-wrap:wrap;row-gap:4px}.tt-p .row .txt{flex:1 1 100%;min-width:0}.brbtn,.tmgo{width:28px;height:28px}}
+/* v2.10: 찾기·여러 개 적기·좁은 화면+큰 글씨 */
+.linkbtn{display:inline-block;margin:-2px 2px 8px;padding:6px 2px;color:var(--cobalt);font-size:13px;font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.srow{display:flex;flex-direction:column;align-items:flex-start;gap:2px;width:100%;text-align:left;padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--ink);margin-bottom:6px}
+.srow b{font-weight:700;overflow-wrap:anywhere}.srow span{font-size:12px;color:var(--muted)}
+.head .t span{display:block;overflow-wrap:anywhere}
+.nz .head{flex-wrap:wrap;row-gap:6px}.nz .head .t{flex:1 1 calc(100% - 70px)}.nz .head .nav{flex:1 1 100%;justify-content:flex-end}
+.nz .head .t{flex:1 1 0;min-width:0}
+.nz .ht-r{grid-template-columns:minmax(46px,1fr) repeat(var(--n),minmax(0,1fr)) 24px;gap:1px}.nz .ht-d{font-size:8px}.nz .ht-d b{font-size:11px}.nz .ht-nb{font-size:11px}.nz .ht-s{font-size:9px}.nz .ht-c{border-radius:4px}
+.mtop .head .t span{white-space:normal;overflow:visible;line-height:1.3}
