@@ -714,7 +714,7 @@ function vDaily(){
   if(st.anc&&st.anc.day!==d)st.anc=null;
   const nowH=d===todayS()?new Date().getHours():-1,nowM=new Date().getMinutes();
   const log=(data().logs||{})[d]||{};
-  if(st.brush&&!st.brush.startsWith('cat:')&&!st.brush.startsWith('q:')&&!ts.some(t=>t.id===st.brush))st.brush=null;
+  if(st.brush&&st.brush!=='erase'&&!st.brush.startsWith('cat:')&&!st.brush.startsWith('q:')&&!ts.some(t=>t.id===st.brush))st.brush=null;
   if(st.brush&&st.brush.startsWith('cat:')&&!okTag(+st.brush.slice(4)))st.brush=null;
   if(st.brush&&st.brush.startsWith('q:')&&!quickList()[+st.brush.slice(2)])st.brush=null;
   const tt=h('div',{class:'tt','data-day':d},
@@ -736,13 +736,14 @@ function vDaily(){
   if(!S.late&&h1<26)tt.append(h('button',{type:'button',class:'tt-more',text:'▼ 밤 시간 보기 (23시~새벽 2시)',on:{click:()=>{S.late=true;save();render()}}}));
   if(S.early||S.late)tt.append(h('button',{type:'button',class:'tt-more',text:'기본 시간(6~22시)만 보기',on:{click:()=>{S.early=false;S.late=false;save();render()}}}));
   // 칠하기: 직접 쓰기(기본) / 할 일 / 카테고리
-  const bTask=st.brush&&!st.brush.startsWith('cat:')&&!st.brush.startsWith('q:')?ts.find(t=>t.id===st.brush):null;
+  const bTask=st.brush&&st.brush!=='erase'&&!st.brush.startsWith('cat:')&&!st.brush.startsWith('q:')?ts.find(t=>t.id===st.brush):null;
   const bchip=(val,label,cls)=>h('button',{type:'button',class:'chip'+(st.brush===val?' on':''),on:{click:()=>{st.brush=st.brush===val?null:val;render()}}},cls?h('i',{class:cls}):null,label);
   const brush=h('div',{class:'brush'},h('span',{class:'lb',text:'칠하기'}),
     h('button',{type:'button',class:'chip'+(st.brush==null?' on':''),on:{click:()=>{st.brush=null;render()}}},'✏️ 직접 쓰기'),
     tagIdx().map(i=>bchip('cat:'+i,tagName(i),'c'+colOf(i)+' sq')),
+    bchip('erase','🧽 지우개'),
     bTask?h('button',{type:'button',class:'chip on',on:{click:()=>{st.brush=null;render()}}},h('i',{class:hasTag(bTask)?'c'+colOf(bTask.tag):'cn'}),'▶ '+bTask.text.slice(0,10)+' ✕'):null);
-  const bName=st.brush==null?null:st.brush.startsWith('q:')?(quickList()[+st.brush.slice(2)]||{text:''}).text:st.brush.startsWith('cat:')?tagName(+st.brush.slice(4)):(data().tasks.find(t=>t.id===st.brush)||{text:''}).text.slice(0,10);
+  const bName=st.brush==null||st.brush==='erase'?null:st.brush.startsWith('q:')?(quickList()[+st.brush.slice(2)]||{text:''}).text:st.brush.startsWith('cat:')?tagName(+st.brush.slice(4)):(data().tasks.find(t=>t.id===st.brush)||{text:''}).text.slice(0,10);
   const sum=actualBox([d],'오늘');
   const labs=labelsOf(d);
   return [h('div',{class:'head'},h('div',{class:'num',text:String(dt.getDate())}),
@@ -753,7 +754,7 @@ function vDaily(){
     h('p',{class:'hint',text:'앞에 시간을 쓰면(3시 병원) 타임라인에 들어가요.'},d!==todayS()?[' ',h('button',{type:'button',style:'color:var(--cobalt);font-weight:700',text:'오늘로 가기',on:{click:()=>{st.day=todayS();render()}}})]:null),
     !ts.length?emptyBox('이 날 할 일이 없어요. 위클리에서 요일을 누르거나 위에 바로 적어요.'):null,
     untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 아래 계획 칸으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true,timer:d===todayS()})))]:null,
-    h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 이미지로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:(bName?'"'+bName+'"(으)로 칠해요. ':'왼쪽 계획의 할 일을 누르면 그 일로 칠해요. ')+'첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 쭉 채워져요. 꾹 누른 채 쓸어도 돼요.'}),tt,
+    h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 이미지로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:st.brush==='erase'?'🧽 지울 첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 지워져요. 꾹 누른 채 쓸어도 돼요. 다 지웠으면 ✏️ 직접 쓰기를 눌러요.':(bName?'"'+bName+'"(으)로 칠하는 중이에요. 이미 칠한 칸을 누르면 고치거나 지울 수 있어요. ':'왼쪽 계획의 할 일을 누르면 그 일로 칠해요. 칠한 칸을 누르면 고치거나 지워요. ')+(st.brush==='erase'?'':'첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 쭉 채워져요. 꾹 누른 채 쓸어도 돼요.')}),tt,
     st.anc&&st.anc.day===d?h('div',{class:'ancbar'},h('span',null,h('b',{text:slotT(st.anc.slot)}),'부터 · 끝 칸을 눌러요'),
       h('button',{type:'button',text:'이 칸만',on:{click:()=>{const a=st.anc.slot;st.anc=null;applyRange(d,a,a)}}}),h('button',{type:'button',text:'취소',on:{click:()=>{st.anc=null;render()}}})):null,
     sum,
@@ -987,7 +988,7 @@ function render(){
 
 // 창
 let closeLayer=null;
-function sheet(...kids){const L=document.getElementById('layer');const dim=h('div',{class:'dim',on:{click:e=>{if(e.target===dim)close()}}},h('div',{class:'sheet',role:'dialog'},...kids));
+function sheet(...kids){const L=document.getElementById('layer');const t0=Date.now();const dim=h('div',{class:'dim',on:{click:e=>{if(e.target===dim&&Date.now()-t0>450)close()}}},h('div',{class:'sheet',role:'dialog'},...kids));
   function close(){L.replaceChildren();closeLayer=null}L.replaceChildren(dim);closeLayer=close;return close}
 
 // 시간 정하기 (위클리·먼슬리·데일리 공통)
@@ -1270,7 +1271,7 @@ function setSlot(slot){
   D.logs[PT.day]=D.logs[PT.day]||{};const L=D.logs[PT.day];
   if(PT.mode==='erase'){
     const it=logItem(L[slot]);
-    if(PT.qt!=null?(it&&it.kind==='e'&&it.text===PT.qt):PT.cat!=null?(it&&it.kind==='e'&&it.tag===PT.cat):L[slot]===PT.val)delete L[slot];
+    if(PT.all||(PT.qt!=null?(it&&it.kind==='e'&&it.text===PT.qt):PT.cat!=null?(it&&it.kind==='e'&&it.tag===PT.cat):L[slot]===PT.val))delete L[slot];
     return null}
   L[slot]=PT.val;return logItem(PT.val);
 }
@@ -1284,6 +1285,8 @@ function prepBrush(day,slot){
   PT.day=day;PT.cat=null;PT.qt=null;PT.a=PT.b=slot;
   const L=(data().logs||{})[day]||{};
   if(st.brush==null){PT.mode='sel';return true}
+  if(st.brush==='erase'){PT.mode='erase';PT.all=true;PT.val=null;return true}
+  PT.all=false;
   if(st.brush.startsWith('cat:')){
     const i=+st.brush.slice(4);PT.cat=i;const it=logItem(L[slot]);
     if(it&&it.kind==='e'&&it.tag===i)PT.mode='erase';
@@ -1291,6 +1294,8 @@ function prepBrush(day,slot){
   }else{if(!data().tasks.some(t=>t.id===st.brush)){st.brush=null;PT.mode='sel';return true}PT.val=st.brush;PT.mode=L[slot]===st.brush?'erase':'paint'}
   return true;
 }
+// 칠한 칸이 지금 고른 칠하기와 같은 것인지
+function sameBrush(v){if(!st.brush)return false;if(st.brush.startsWith('cat:')){const it=logItem(v);return !!(it&&it.kind==='e'&&it.tag===+st.brush.slice(4))}return v===st.brush}
 // 처음 칸~끝 칸 한 번에
 function applyRange(day,lo,hi){
   prepBrush(day,lo);
@@ -1304,7 +1309,7 @@ function tapCell(el){
   const tt=el.closest('.tt');if(!tt)return;
   const day=tt.dataset.day,slot=+el.dataset.slot,L=(data().logs||{})[day]||{};
   if(st.anc&&st.anc.day===day){const a=st.anc.slot;st.anc=null;applyRange(day,Math.min(a,slot),Math.max(a,slot));return}
-  if(st.brush==null&&L[slot]){editRun(day,slot);return}
+  if(L[slot]&&st.brush!=='erase'&&(st.brush==null||!sameBrush(L[slot]))){editRun(day,slot);return}
   st.anc={day,slot};render();
   try{navigator.vibrate&&navigator.vibrate(8)}catch(_){}
 }
@@ -1328,7 +1333,7 @@ function showPGhost(p){
 }
 function paintStart(e){
   const el=e.target.closest('.tt-g .cell');if(!el)return;
-  if(e.type==='mousedown'){if(e.cancelable)e.preventDefault();paintBegin(el);return}
+  if(e.type==='mousedown'){if(e.cancelable)e.preventDefault();const tt=el.closest('.tt'),L=tt?((data().logs||{})[tt.dataset.day]||{}):{},v=L[+el.dataset.slot];if(tt&&v&&st.brush&&st.brush!=='erase'&&!sameBrush(v)){editRun(tt.dataset.day,+el.dataset.slot);return}paintBegin(el);return}
   // 손가락: 0.35초 가만히 누르고 있으면 칠하기 시작, 그 전에 움직이면 그냥 스크롤
   const p=e.touches[0];clearTimeout(PH.timer);
   Object.assign(PH,{el,x:p.clientX,y:p.clientY});

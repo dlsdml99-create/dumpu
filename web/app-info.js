@@ -45,13 +45,33 @@
       .catch(function () { if (manual && statusEl) statusEl.textContent = '인터넷 연결을 확인해 주세요'; });
   }
 
+  // 앱을 열 때마다 새 버전이 있으면 알려주기 (N빵·챙김이와 같은 창). '나중에'를 누르면 6시간 동안은 다시 묻지 않음 (앱을 새로 열면 다시 알려줌)
+  var asked = false, dlg = null;
   function promptOnce() {
-    var k = 'appinfo.prompted';
-    try { if (localStorage.getItem(k) === latest) return; localStorage.setItem(k, latest); } catch (e) {}
-    open(true);
+    if (asked || dlg || layer) return;
+    var k = 'appinfo.later';
+    try { var t = +localStorage.getItem(k) || 0; if (resumed && Date.now() - t < 6 * 3600e3) return; } catch (e) {}
+    asked = true;
+    dlg = mk('div', 'dim upd-dim');
+    var box = mk('div', 'upd-box'); box.setAttribute('role', 'alertdialog'); box.setAttribute('aria-labelledby', 'upd-t');
+    var t1 = mk('h3', null, '새 버전이 있어요'); t1.id = 'upd-t';
+    var p1 = mk('p', null, 'v' + latest + ' 업데이트가 나왔어요.');
+    var p2 = mk('p', null, isApp() ? '\'업데이트\'를 누르면 파일이 받아져요. 다 받으면 알림이나 다운로드에서 파일을 눌러 설치하세요. 적어 둔 내용은 그대로 남아요.' : '\'업데이트\'를 누르면 바로 새 버전으로 바뀌어요.');
+    var row = mk('div', 'upd-row');
+    var later = mk('button', 'upd-later', '나중에'); later.type = 'button';
+    later.onclick = function () { try { localStorage.setItem(k, String(Date.now())); } catch (e) {} closeDlg(); };
+    var go = mk('button', 'upd-go', '업데이트'); go.type = 'button';
+    go.onclick = function () { closeDlg(); update(); };
+    row.append(later, go); box.append(t1, p1, p2, row); dlg.append(box); document.body.append(dlg);
   }
+  function closeDlg() { if (dlg) { dlg.remove(); dlg = null; } }
+  var resumed = false;
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    resumed = true; asked = false; check(false); // 오래 켜 둔 앱도 다시 볼 때 확인
+  });
 
-  function close() { if (layer) { layer.remove(); layer = null; statusEl = null; return true; } return false; }
+  function close() { if (dlg) { closeDlg(); return true; } if (layer) { layer.remove(); layer = null; statusEl = null; return true; } return false; }
 
   var sheetBox = null;
   function render() {
@@ -86,7 +106,7 @@
 
   window.AppInfo = {
     close: close,
-    isOpen: function () { return !!layer; },
+    isOpen: function () { return !!layer || !!dlg; },
     native: function (v) { if (/^v?\d+(\.\d+)*$/.test(String(v))) { latest = String(v).replace(/^v/, ''); paint(); } },
     init: function () {
       el = document.querySelector(I.mount);

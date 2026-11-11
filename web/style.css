@@ -406,3 +406,12 @@ body.painting{-webkit-user-select:none;user-select:none}
 .ypx .s5,.ypl .s5{background:#2E9E6B}.ypx .s4,.ypl .s4{background:#8CCB6E}.ypx .s3,.ypl .s3{background:#F2C94C}.ypx .s2,.ypl .s2{background:#F2994A}.ypx .s1,.ypl .s1{background:#D2453A}
 .ypl{display:flex;align-items:center;flex-wrap:wrap;gap:3px;font-size:11px;color:var(--muted);margin:6px 0 0}
 .ypl i{display:inline-block;width:10px;height:10px;flex:none;margin-left:6px}
+
+/* 새 버전 알림 창 (앱을 열 때) */
+.upd-dim{align-items:center!important;justify-content:center;padding:24px}
+.upd-box{background:var(--card);color:var(--ink);width:100%;max-width:400px;border-radius:16px;padding:22px 22px 12px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.upd-box h3{margin:0 0 10px;font-size:20px;font-weight:800}
+.upd-box p{margin:6px 0;font-size:15px;line-height:1.55;color:var(--ink)}
+.upd-row{display:flex;justify-content:flex-end;gap:18px;margin-top:14px}
+.upd-row button{padding:10px 6px;font-weight:800;font-size:15px;color:var(--cobalt)}
+.upd-row .upd-later{color:var(--muted)}
