@@ -283,7 +283,7 @@ public class AlarmReceiver extends BroadcastReceiver {
         Intent open = new Intent(c, MainActivity.class).putExtra("open", "daily")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent pi = PendingIntent.getActivity(c, 2, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        String text = prev + "시~" + (prev + 1) + "시에 뭐 했어요? 눌러서 10분 칸에 적어요";
+        String text = prev + "시~" + (prev + 1) + "시에 무엇을 했나요? 눌러서 10분 칸에 적어요";
         Notification.Builder b = Build.VERSION.SDK_INT >= 26 ? new Notification.Builder(c, CH_HOUR) : new Notification.Builder(c);
         b.setSmallIcon(R.drawable.ic_noti).setContentTitle("덤푸 · 지난 1시간").setContentText(text)
                 .setAutoCancel(true).setContentIntent(pi);

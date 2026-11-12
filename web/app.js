@@ -388,7 +388,7 @@ function dayImage(d){
     const lines=[];let cur='';for(const ch of '“'+diary+'”'){if(g.measureText(cur+ch).width>W-120){lines.push(cur);cur=ch}else cur+=ch}lines.push(cur);
     lines.slice(0,2).forEach((l,i)=>g.fillText(l,60,sy+110+i*40))}
   g.textAlign='right';g.fillStyle=C.mu;g.font='500 26px '+F;g.fillText('덤푸',W-60,H-30);g.textAlign='left';
-  showImage(c,md(d)+' 이미지',md(d)+' 10분 플래너 그림','dumpu-'+d);
+  showImage(c,md(d)+' 그림',md(d)+' 10분 플래너 그림','dumpu-'+d);
 }
 // 그림 보여주고 저장·공유 (데일리·월말 돌아보기 공통)
 function showImage(c,title,alt,fname){
@@ -397,7 +397,7 @@ function showImage(c,title,alt,fname){
     B&&B.saveImage?[
       h('button',{class:'btn pri',type:'button',text:'사진첩에 저장',on:{click:()=>{const r=B.saveImage(url.split(',')[1],false);toast(r==='ok'?'사진첩(Pictures/덤푸)에 저장했어요':r==='old'?'이 폰(안드로이드 9 이하)에서는 저장이 안 돼요':'저장하지 못했어요')}}}),
       h('button',{class:'btn',type:'button',text:'공유하기 (카톡·인스타 등)',on:{click:()=>{const r=B.saveImage(url.split(',')[1],true);if(r!=='ok')toast(r==='old'?'이 폰에서는 공유가 안 돼요':'공유하지 못했어요')}}})]:
-    [h('button',{class:'btn pri',type:'button',text:'이미지 저장·공유',on:{click:()=>{c.toBlob(bl=>{if(!bl)return;const f=new File([bl],fname+'.png',{type:'image/png'});
+    [h('button',{class:'btn pri',type:'button',text:'그림 저장·공유',on:{click:()=>{c.toBlob(bl=>{if(!bl)return;const f=new File([bl],fname+'.png',{type:'image/png'});
         if(navigator.canShare&&navigator.canShare({files:[f]}))navigator.share({files:[f],title:'덤푸 '+title}).catch(()=>{});
         else{const a=document.createElement('a');a.href=URL.createObjectURL(bl);a.download=f.name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}})}}}),
      h('p',{text:'아이폰은 사진을 길게 눌러 "사진에 저장"해도 돼요.'})]);
@@ -507,7 +507,7 @@ setInterval(()=>{
 // ── 기분 모아 보기 (습관 탭): 이번 달 기분, 기분 좋은 날 한 것, 1년 기분 한눈에
 const MSCORE={'😆':5,'😊':4,'🙂':4,'😐':3,'😴':3,'😔':2,'😢':1,'😠':1};
 function moodBox(){
-  const D=data(),M=D.mood||{},keys=Object.keys(M);if(!keys.length)return h('div',{class:'rbox'},h('b',{text:'기분'}),h('p',{class:'hint',style:'margin:4px 0 0',text:'데일리 맨 아래 "오늘의 한 줄"에서 기분을 고르면, 여기서 기분 좋은 날 무엇을 했는지 보여드려요.'}));
+  const D=data(),M=D.mood||{},keys=Object.keys(M);if(!keys.length)return h('div',{class:'rbox'},h('b',{text:'기분'}),h('p',{class:'hint',style:'margin:4px 0 0',text:'데일리 맨 아래 "오늘의 한 줄"에서 기분을 고르면, 여기서 기분 좋은 날 무엇을 했는지 보여 드려요.'}));
   const mk=mKey(),mon=keys.filter(k=>k.slice(0,7)===mk),cnt={};mon.forEach(k=>cnt[M[k]]=(cnt[M[k]]||0)+1);
   // 습관을 한 날 vs 안 한 날의 '기분 좋은 날' 비율 (최근 90일, 기분을 고른 날만)
   const t0=todayS(),cut=ymd(new Date(parse(t0).getTime()-90*864e5)),days=keys.filter(k=>k>=cut&&k<=t0);
@@ -522,7 +522,7 @@ function moodBox(){
     for(let d=1;d<=31;d++){const k=y+'-'+pad(m+1)+'-'+pad(d),v=M[k];row.append(h('i',{class:d>last?'x':v?'s'+MSCORE[v]:'',title:v?md(k)+' '+v:null}))}grid.append(row)}
   return h('div',{class:'rbox'},h('b',{text:(st.m+1)+'월 기분'}),
     mon.length?h('p',{class:'mcnt'},MOODS.filter(m=>cnt[m]).map(m=>h('span',{text:m+' '+cnt[m]+'일'}))):h('p',{class:'hint',style:'margin:4px 0',text:'이번 달은 아직 고른 기분이 없어요.'}),
-    finds.length?finds.slice(0,3).map(f=>h('p',{class:'mfind'},h('b',{text:hbMark(f.hb)+' '+f.hb.name}),' 한 날은 기분 좋은 날이 '+f.pa+'%, 안 한 날은 '+f.pb+'%예요')):days.length>=14?h('p',{class:'hint',style:'margin:4px 0',text:'아직 기분과 크게 이어진 습관이 보이지 않아요. 더 쌓이면 알려드려요.'}):h('p',{class:'hint',style:'margin:4px 0',text:'기분을 2주 넘게 고르면, 기분 좋은 날 어떤 습관을 했는지 알려드려요.'}),
+    finds.length?finds.slice(0,3).map(f=>h('p',{class:'mfind'},h('b',{text:hbMark(f.hb)+' '+f.hb.name}),' 한 날은 기분 좋은 날이 '+f.pa+'%, 안 한 날은 '+f.pb+'%예요')):days.length>=14?h('p',{class:'hint',style:'margin:4px 0',text:'아직 기분과 크게 이어진 습관이 보이지 않아요. 더 쌓이면 알려 드려요.'}):h('p',{class:'hint',style:'margin:4px 0',text:'기분을 2주 넘게 고르면, 기분 좋은 날 어떤 습관을 했는지 알려 드려요.'}),
     h('div',{class:'sec',style:'margin-top:10px',text:y+'년 기분 한눈에'}),grid,
     h('p',{class:'ypl'},h('i',{class:'s5'}),'아주 좋음 ',h('i',{class:'s4'}),'좋음 ',h('i',{class:'s3'}),'보통 ',h('i',{class:'s2'}),'안 좋음 ',h('i',{class:'s1'}),'힘듦'))}
 // 오늘 기분 (한 줄 일기 위)
@@ -537,7 +537,7 @@ function diaryBox(d){
   const keep=()=>{const v=ta.value.trim().slice(0,200);const D=data();D.diary=D.diary||{};if(v)D.diary[d]=v;else delete D.diary[d];save()};
   ta.addEventListener('input',()=>{clearTimeout(tm);tm=setTimeout(keep,600)});
   ta.addEventListener('blur',()=>{clearTimeout(tm);keep()});
-  return h('div',null,moodRow(d),ta,h('p',{class:'hint',style:'margin:2px 0 0;text-align:right',text:'기분 하나 고르고 한 줄 남겨요 · 저절로 저장, 달력·이미지에도 나와요'}));
+  return h('div',null,moodRow(d),ta,h('p',{class:'hint',style:'margin:2px 0 0;text-align:right',text:'기분 하나 고르고 한 줄 남겨요 · 저절로 저장, 달력·그림에도 나와요'}));
 }
 // 한 주 10분 기록 모아 보기 (잠·일·운동 패턴)
 function weekGrid(w){
@@ -579,7 +579,7 @@ function routineBox(days,label){
   if(!upto.length)return null;
   const rows=D.reps.map(r=>{const inst=D.tasks.filter(t=>t.rep===r.id&&upto.includes(t.day));return {r,n:inst.length,done:inst.filter(t=>t.done).length}}).filter(x=>x.n);
   if(!rows.length)return null;
-  return h('div',{class:'rbox'},h('b',{text:label+' 루틴'}),rows.map(x=>{const p=Math.round(x.done/x.n*100);const cls=okTag(x.r.tag)?colOf(x.r.tag):'n';
+  return h('div',{class:'rbox'},h('b',{text:label+' 반복 일정'}),rows.map(x=>{const p=Math.round(x.done/x.n*100);const cls=okTag(x.r.tag)?colOf(x.r.tag):'n';
     return h('div',{class:'rrow'},h('span',{class:'rn tc'+cls,text:'♥ '+x.r.text.slice(0,10)}),h('span',{class:'rbar'},h('i',{class:'c'+cls,style:'width:'+p+'%'})),h('span',{class:'rp',text:x.done+'/'+x.n+' · '+p+'%'}))}));
 }
 function actualBox(days,label){
@@ -812,10 +812,10 @@ function vDaily(){
       h('div',{class:'nav'},h('button',{type:'button','aria-label':'전날',text:'‹',on:{click:()=>shift(-1)}}),h('button',{type:'button','aria-label':'다음날',text:'›',on:{click:()=>shift(1)}}),searchBtn(),gearBtn())),
     d===todayS()?lateBox('day'):null,
     h('div',{class:'add'},inp,h('button',{class:'go',type:'button',text:'추가',on:{click:go}})),tagPicker(),
-    h('p',{class:'hint',text:'앞에 시간을 쓰면(3시 병원) 타임라인에 들어가요.'},d!==todayS()?[' ',h('button',{type:'button',style:'color:var(--cobalt);font-weight:700',text:'오늘로 가기',on:{click:()=>{st.day=todayS();render()}}})]:null),
+    h('p',{class:'hint',text:'앞에 시간을 쓰면(3시 병원) 시간표에 들어가요.'},d!==todayS()?[' ',h('button',{type:'button',style:'color:var(--cobalt);font-weight:700',text:'오늘로 가기',on:{click:()=>{st.day=todayS();render()}}})]:null),
     !ts.length?emptyBox('이 날 할 일이 없어요. 위클리에서 요일을 누르거나 위에 바로 적어요.'):null,
     untimed.length||timed.length?[h('div',{class:'sec','data-drop':'notime',text:'시간 안 정함 '+untimed.length+(untimed.length?' · 길게 눌러 아래 계획 칸으로 끌기':'')}),h('div',{class:'list','data-list':'u','data-drop':'notime'},untimed.map(t=>taskRow(t,null,{noDay:true,drop:true,brush:true,timer:d===todayS()})))]:null,
-    h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 이미지로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:st.brush==='erase'?'🧽 지울 첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 지워져요. 꾹 누른 채 쓸어도 돼요. 다 지웠으면 ✏️ 직접 쓰기를 눌러요.':(bName?'"'+bName+'"(으)로 칠하는 중이에요. 이미 칠한 칸을 누르면 고치거나 지울 수 있어요. ':'할 일 옆 🖌를 누르면 그 일로 칠해요. 칠한 칸을 누르면 고치거나 지워요. ')+(st.brush==='erase'?'':'첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 쭉 채워져요. 꾹 누른 채 쓸어도 돼요.')}),tt,
+    h('div',{class:'sec'},'10분 플래너 ',h('button',{type:'button',class:'imgbtn',text:'🖼 그림으로 저장·공유',on:{click:()=>dayImage(d)}})),brush,h('p',{class:'hint',style:'margin:0 0 8px',text:st.brush==='erase'?'🧽 지울 첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 지워져요. 꾹 누른 채 쓸어도 돼요. 다 지웠으면 ✏️ 직접 쓰기를 눌러요.':(bName?'"'+bName+'"(으)로 칠하는 중이에요. 이미 칠한 칸을 누르면 고치거나 지울 수 있어요. ':'할 일 옆 🖌를 누르면 그 일로 칠해요. 칠한 칸을 누르면 고치거나 지워요. ')+(st.brush==='erase'?'':'첫 칸을 톡, 끝 칸을 톡 누르면 그 사이가 쭉 채워져요. 꾹 누른 채 쓸어도 돼요.')}),tt,
     st.anc&&st.anc.day===d?h('div',{class:'ancbar'},h('span',null,h('b',{text:slotT(st.anc.slot)}),'부터 · 끝 칸을 눌러요'),
       h('button',{type:'button',text:'이 칸만',on:{click:()=>{const a=st.anc.slot;st.anc=null;applyRange(d,a,a)}}}),h('button',{type:'button',text:'취소',on:{click:()=>{st.anc=null;render()}}})):null,
     sum,
@@ -916,7 +916,7 @@ function vHabit(){
       return h('div',{class:'rrow2'},h('div',{class:'rrow'},h('span',{class:'rn tc'+cls,text:(hb.icon?hb.icon+' ':'')+hb.name.slice(0,10)}),h('span',{class:'rbar'},h('i',{class:'c'+cls,style:'width:'+r.pc+'%'})),h('span',{class:'rp',text:r.pc+'%'+(streak>=2?' 🔥'+streak+(hb.goal?'주':''):'')})),
         h('small',{class:'rsub',text:(hb.goal?'주 '+hb.goal+'번 목표 · ':habitDays(hb)+' · ')+(hb.time?'⏰'+hb.time+' · ':'')+r.n+'번 했어요'+diffTxt(r.pc,pr)}))})):null,
     moodBox(),
-    H.length?h('button',{type:'button',class:'btn',style:'margin:8px 0',text:'🖼 이번 달 돌아보기 이미지',on:{click:()=>monthImage()}}):null,
+    H.length?h('button',{type:'button',class:'btn',style:'margin:8px 0',text:'🖼 이번 달 돌아보기 그림',on:{click:()=>monthImage()}}):null,
     ARCH.length?[h('div',{class:'sec',text:'보관한 습관 '+ARCH.length+' · 기록은 그대로 남아요'}),h('div',{class:'list'},ARCH.map(hb=>{const n=Object.values(D.hchk||{}).filter(a=>a.includes(hb.id)).length;
       return h('div',{class:'row'},h('div',{class:'top'},h('span',{class:'txt',text:(hb.icon?hb.icon+' ':'')+hb.name+' · '+n+'번 했어요'}),
         h('button',{type:'button',class:'chip on',text:'되살리기',on:{click:()=>{hb.arch=false;save();render();toast(hb.name+' 습관을 되살렸어요')}}}),
@@ -937,7 +937,7 @@ function delHabit(hb,after){
       for(const d in D.hchk){D.hchk[d]=D.hchk[d].filter(x=>x!==hb.id);if(!D.hchk[d].length)delete D.hchk[d]}
       for(const d in D.hnote){delete D.hnote[d][hb.id];if(!Object.keys(D.hnote[d]).length)delete D.hnote[d]}
       save();close();render();toast('지웠어요')}}}),
-    h('button',{class:'btn',type:'button',text:'그만두기',on:{click:()=>{close();if(after)after()}}}));
+    h('button',{class:'btn',type:'button',text:'취소',on:{click:()=>{close();if(after)after()}}}));
 }
 // 습관 칸 메모 (길게 누르기): 적으면 그 날 한 것으로 체크
 function memoSheet(hb,d){
@@ -994,8 +994,8 @@ function habitSheet(hb){
     h('button',{type:'button',class:'btn',style:'margin-top:4px',text:'+ 쉬는 기간 넣기',on:{click:()=>{const a=pa.value,b=pb.value;if(!isDate(a)||!isDate(b)){toast('날짜를 골라 주세요');return}
       pauses.push(a<=b?{a,b}:{a:b,b:a});pauses.sort((x,y)=>x.a<y.a?-1:1);drawP()}}})].flat(Infinity).filter(x=>x!=null));
   drawP();
-  const close=sheet(h('h3',{text:'습관 고치기'}),ni,h('div',{class:'sec',text:'아이콘'}),iRow,h('div',{class:'sec',text:'목표'}),gRow,h('div',{class:'sec',text:'하는 요일 (요일마다일 때)'}),dRow,h('div',{class:'sec',text:'색 (카테고리)'}),tagRow,
-    h('div',{class:'sec',text:'알림 시간'}),h('div',{class:'set'},h('span',null,'이 시간에 "'+hb.name.slice(0,10)+' 할 시간이에요"',h('small',{text:B?'한 날·쉬는 날은 안 울려요. 비우면 알림 없음':'알림은 안드로이드 앱에서 울려요'})),tm),
+  const close=sheet(h('h3',{text:'습관 고치기'}),ni,h('div',{class:'sec',text:'아이콘'}),iRow,h('div',{class:'sec',text:'목표'}),gRow,h('div',{class:'sec',text:'하는 요일 (요일을 정할 때)'}),dRow,h('div',{class:'sec',text:'색 (카테고리)'}),tagRow,
+    h('div',{class:'sec',text:'알림 시간'}),h('div',{class:'set'},h('span',null,'이 시간에 "'+hb.name.slice(0,10)+' 할 시간이에요"',h('small',{text:B?'이미 한 날과 쉬는 날은 울리지 않아요. 비워 두면 알림이 없어요':'알림은 안드로이드 앱에서 울려요'})),tm),
     h('div',{class:'sec',text:'쉬는 기간'}),pRow,
     h('button',{class:'btn pri',type:'button',text:'저장',on:{click:()=>{const v=ni.value.trim().slice(0,20);if(!v){toast('이름을 적어 주세요');return}if(!dows.size){toast('요일을 하나 이상 골라 주세요');return}
       hb.name=v;hb.tag=tag;hb.icon=icon;hb.goal=goal;hb.dows=dows.size===7?null:[...dows].sort();
@@ -1214,7 +1214,7 @@ function settingsSheet(){
       h('div',{class:'set'},h('span',null,'"3시 병원"처럼 시간을 정한 할 일',h('small',{text:B?'정한 때에 알려줘요. 끝낸 일은 알리지 않아요.':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'}))),
       h('div',{class:'chips',style:'padding-left:0;margin-bottom:6px'},[[-1,'끄기'],[0,'정각에'],[10,'10분 전'],[30,'30분 전'],[60,'1시간 전']].map(([v,l])=>h('button',{type:'button',class:'chip'+(((S.remind??10)===v)?' on':''),text:l,'aria-pressed':((S.remind??10)===v)?'true':'false',on:{click:()=>{S.remind=v;if(v>=0&&B&&!demo)B.requestNoti();save();draw()}}}))),
       h('div',{class:'sec',text:'매시간 기록 알림'}),
-      h('div',{class:'set'},h('span',null,'"지난 1시간 뭐 했어요?" 알림',h('small',{text:B?'정한 시간 동안 매시 정각쯤 알려줘요. 이미 적은 시간은 건너뛰어요.':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'})),
+      h('div',{class:'set'},h('span',null,'"지난 1시간 동안 무엇을 했나요?" 알림',h('small',{text:B?'정한 시간 동안 매시 정각쯤 알려줘요. 이미 적은 시간은 건너뛰어요.':'아이폰·웹에서는 알림이 울리지 않아요 (안드로이드 앱에서 돼요)'})),
         h('button',{type:'button',class:'sw'+(S.hourly?' on':''),'aria-label':'매시간 기록 알림',on:{click:()=>{S.hourly=!S.hourly;if(S.hourly&&B&&!demo)B.requestNoti();save();draw()}}})),
       S.hourly?h('div',{class:'set'},h('span',{text:'알림 받을 시간'}),hourSel('hFrom',S.hFrom),h('span',{text:'~',style:'flex:none'}),hourSel('hTo',S.hTo)):null,
       h('div',{class:'sec',text:'10분 플래너 시간'}),
@@ -1229,7 +1229,7 @@ function settingsSheet(){
       h('div',{class:'sec',text:'카테고리 '+S.tags.length}),tagInputs,
       h('div',{class:'sec',text:'백업 (폰 바꿀 때)'}),h('p',{text:'할 일·반복·기념일·습관·기분·일기·10분 기록을 한 파일로 옮겨요.'}),
       h('div',{class:'two'},h('button',{class:'btn',style:'margin:0',type:'button',text:'내보내기',on:{click:()=>{if(demo){toast('예시 보기에서는 백업이 안 돼요');return}exportSheet()}}}),h('button',{class:'btn',style:'margin:0',type:'button',text:'가져오기',on:{click:importSheet}})),
-      h('div',{class:'sec',text:'반복 할 일 '+D.reps.length}),
+      h('div',{class:'sec',text:'반복 일정 '+D.reps.length}),
       D.reps.length?D.reps.map(r=>h('div',{class:'set'},h('span',null,r.text,h('small',{text:'↻ '+repLabel(r)+(r.time?' '+r.time:'')})),h('button',{type:'button',class:'chip',text:'그만하기',on:{click:()=>{stopRep(r);settingsSheet()}}}))):h('p',{text:'할 일을 누르고 "반복하기"를 고르면 여기에 모여요.'})].flat(Infinity).filter(x=>x!=null&&x!==false));
   };
   draw();
@@ -1525,7 +1525,7 @@ function exportSheet(){
   const pw=h('input',{type:'password',id:'expPw',maxlength:'40',autocomplete:'new-password',placeholder:'비밀번호 (6글자 이상)','aria-label':'백업 비밀번호'});
   const lockRow=LOCK.ok()?h('div',{class:'lockrow'},h('p',{class:'hint',text:'🔒 일기·기분이 들어 있어요. 비밀번호로 잠그면 다른 사람이 글을 봐도 내용을 못 읽어요.'}),
     h('div',{class:'add'},pw,h('button',{class:'go',type:'button',text:'잠그기',on:{click:()=>{const v=pw.value;if(v.length<6){toast('비밀번호를 6글자 이상 넣어 주세요');return}
-      LOCK.seal(plain,v).then(o=>{code='DUMPU2L:'+JSON.stringify(o);ta.value=code;pw.value='';toast('잠갔어요 · 이제 복사하세요. 비밀번호는 꼭 기억해 두세요')},()=>toast('이 폰에서는 잠글 수 없어요'))}}}))):null;
+      LOCK.seal(plain,v).then(o=>{code='DUMPU2L:'+JSON.stringify(o);ta.value=code;pw.value='';toast('잠갔어요 · 이제 복사해 주세요. 비밀번호는 꼭 기억해 두세요')},()=>toast('이 폰에서는 잠글 수 없어요'))}}}))):null;
   sheet(h('h3',{text:'백업 내보내기'}),
     h('p',{text:'들어 있는 기록: '+cntTxt(real)+'. 이 글을 카톡 나와의 채팅이나 메모에 붙여 두면 새 폰에서 "가져오기"로 그대로 옮길 수 있어요.'}),lockRow,ta,
     h('button',{class:'btn pri',type:'button',text:'복사하기',on:{click:()=>{
