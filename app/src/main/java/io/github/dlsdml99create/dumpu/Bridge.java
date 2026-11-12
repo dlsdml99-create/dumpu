@@ -12,7 +12,7 @@ import android.webkit.JavascriptInterface;
 
 import java.io.OutputStream;
 
-/** 앱 화면(자바스크립트)과 폰 기능을 잇는 다리. 화면에서 부를 수 있는 건 아래 7개뿐. */
+/** 앱 화면(자바스크립트)과 폰 기능을 잇는 다리. 화면에서 부를 수 있는 건 아래 9개뿐. */
 public class Bridge {
     private final MainActivity act;
 
@@ -54,6 +54,18 @@ public class Bridge {
             } catch (Exception ignored) { }
         });
     }
+
+    /** 백업 파일 저장: 사용자가 '파일' 창에서 고른 곳에만 써요 (권한 필요 없음, 인터넷으로 보내지 않음). */
+    @JavascriptInterface
+    public void backupSave(String name, String text) {
+        if (text == null || text.isEmpty() || text.length() > 15_000_000) { act.js("window.__bkDone&&window.__bkDone(false)"); return; }
+        String n = name != null && name.matches("[A-Za-z0-9._-]{1,60}") ? name : "dumpu-backup.json";
+        act.runOnUiThread(() -> act.startBackupSave(n, text));
+    }
+
+    /** 백업 파일 불러오기: 사용자가 고른 파일 하나만 읽어요. */
+    @JavascriptInterface
+    public void backupOpen() { act.runOnUiThread(act::startBackupOpen); }
 
     /**
      * 데일리 그림(PNG)을 사진첩 Pictures/덤푸 에 저장하고, share 면 공유 창을 띄운다.

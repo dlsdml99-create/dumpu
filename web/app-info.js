@@ -3,7 +3,7 @@
 (function () {
   'use strict';
   var I = window.APP_INFO;
-  var el = null, latest = null, layer = null, statusEl = null;
+  var el = null, latest = null, layer = null, statusEl = null, checking = false, failed = false;
   var APK = 'https://github.com/' + I.repo + '/releases/latest/download/' + I.apkName;
   var PAGE = 'https://' + I.repo.split('/')[0] + '.github.io/' + I.repo.split('/')[1] + '/';
 
@@ -22,8 +22,11 @@
   }
   function statusText() {
     if (!I.online) return '미리보기에서는 새 버전을 확인하지 않아요';
+    if (checking) return '새 버전을 확인하는 중이에요…';
     if (hasNew()) return '새 버전(v' + latest + ')이 나왔어요';
-    return '지금 쓰는 버전이 최신이에요';
+    if (failed && !latest) return '새 버전을 확인하지 못했어요. 인터넷 연결 후 다시 눌러 주세요.';
+    if (!latest) return '새 버전 확인을 눌러 주세요.';
+    return '지금 쓰는 버전이 최신이에요.';
   }
 
   function update() {
@@ -33,16 +36,18 @@
 
   function check(manual) {
     if (!I.online) { if (manual && statusEl) statusEl.textContent = statusText(); return; }
-    if (manual && statusEl) statusEl.textContent = '확인하는 중…';
+    checking = true; if (manual && statusEl) statusEl.textContent = statusText();
     fetch('https://api.github.com/repos/' + I.repo + '/releases/latest', { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
-        if (j && typeof j.tag_name === 'string' && /^v?\d+(\.\d+)*$/.test(j.tag_name)) latest = j.tag_name.replace(/^v/, '');
+        checking = false;
+        if (j && typeof j.tag_name === 'string' && /^v?\d+(\.\d+)*$/.test(j.tag_name)) { latest = j.tag_name.replace(/^v/, ''); failed = false; }
+        else failed = true;
         paint();
         if (!manual && hasNew()) promptOnce();
         if (manual && statusEl) render();
       })
-      .catch(function () { if (manual && statusEl) statusEl.textContent = '인터넷 연결을 확인해 주세요'; });
+      .catch(function () { checking = false; failed = true; paint(); });
   }
 
   // 앱을 열 때마다 새 버전이 있으면 알려주기 (N빵·챙김이와 같은 창). '나중에'를 누르면 6시간 동안은 다시 묻지 않음 (앱을 새로 열면 다시 알려줌)
@@ -54,7 +59,7 @@
     asked = true;
     dlg = mk('div', 'dim upd-dim');
     var box = mk('div', 'upd-box'); box.setAttribute('role', 'alertdialog'); box.setAttribute('aria-labelledby', 'upd-t');
-    var t1 = mk('h3', null, '새 버전이 있어요'); t1.id = 'upd-t';
+    var t1 = mk('h3', null, '새 버전이 나왔어요'); t1.id = 'upd-t';
     var p1 = mk('p', null, 'v' + latest + ' 업데이트가 나왔어요.');
     var p2 = mk('p', null, isApp() ? '\'업데이트\'를 누르면 파일이 받아져요. 다 받으면 알림이나 다운로드에서 파일을 눌러 설치하세요. 적어 둔 내용은 그대로 남아요.' : '\'업데이트\'를 누르면 바로 새 버전으로 바뀌어요.');
     var row = mk('div', 'upd-row');
@@ -78,9 +83,9 @@
     if (!sheetBox) return;
     sheetBox.replaceChildren();
     var h3 = mk('h3'); h3.append(I.name + ' '); h3.append(mk('span', 'pill' + (hasNew() ? ' new' : ''), 'v' + I.version));
-    var xb = mk('button', 'ai-x', '닫기'); xb.type = 'button'; xb.setAttribute('aria-label', '정보 창 닫기'); xb.onclick = function () { close(); }; h3.append(xb);
-    statusEl = mk('p', null, statusText());
-    sheetBox.append(h3, statusEl);
+    var xb = mk('button', 'shx', '×'); xb.type = 'button'; xb.setAttribute('aria-label', '정보 창 닫기'); xb.onclick = function () { close(); };
+    statusEl = mk('p', 'ai-st', statusText()); statusEl.setAttribute('aria-live', 'polite');
+    sheetBox.append(xb, h3, statusEl);
     if (hasNew()) {
       var up = mk('button', 'btn pri', isApp() ? '업데이트 받기 (v' + latest + ')' : '새로고침해서 업데이트');
       up.type = 'button'; up.onclick = update; sheetBox.append(up);
@@ -88,8 +93,21 @@
     }
     var ck = mk('button', 'btn', '새 버전 확인'); ck.type = 'button'; ck.onclick = function () { check(true); };
     sheetBox.append(ck);
+    if (I.backup) {
+      sheetBox.append(mk('div', 'sec', '내 데이터 백업'));
+      var bk = mk('div', 'two');
+      var b1 = mk('button', 'btn', '백업 파일로 저장'); b1.type = 'button'; b1.style.margin = '0'; b1.onclick = function () { close(); I.backup.save(); };
+      var b2 = mk('button', 'btn', '백업 불러오기'); b2.type = 'button'; b2.style.margin = '0'; b2.onclick = function () { close(); I.backup.open(); };
+      bk.append(b1, b2); sheetBox.append(bk);
+    }
     sheetBox.append(mk('div', 'sec', '업데이트 내용'));
-    I.notes.forEach(function (n) { var d = mk('div', 'note'); d.append(mk('b', null, 'v' + n[0] + ' · ' + n[1])); d.append(n[2]); sheetBox.append(d); });
+    I.notes.forEach(function (n) {
+      var d = mk('div', 'note'); d.append(mk('b', null, 'v' + n[0] + ' · ' + n[1]));
+      // 업데이트 내용은 점 목록으로 (예전 긴 문단은 문장마다 나눔)
+      var items = Array.isArray(n[2]) ? n[2] : String(n[2]).replace(/([요다]\.|[요다]\)\.?)\s+/g, '$1\n').split('\n');
+      var ul = mk('ul'); items.forEach(function (t) { if (String(t).trim()) ul.append(mk('li', null, String(t).trim())); });
+      d.append(ul); sheetBox.append(d);
+    });
     sheetBox.append(mk('div', 'sec', '개인정보'));
     sheetBox.append(mk('p', null, I.privacy));
     var pg = mk('p', null, '다운로드 페이지: ' + PAGE); pg.style.userSelect = 'text'; sheetBox.append(pg);

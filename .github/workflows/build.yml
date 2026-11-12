@@ -42,6 +42,10 @@ jobs:
       - name: 버전 읽기
         run: echo "VERSION=$(grep -oP 'name="app-version" content="\K[0-9]+\.[0-9]+' web/index.html)" >> "$GITHUB_ENV"
 
+      - name: 버전 표시 확인 (화면 버튼 글씨와 실제 버전이 같아야 해요)
+        run: |
+          grep -q ">v$VERSION</button>" web/index.html || { echo "::error::web/index.html 의 버전 버튼 글씨를 v$VERSION 로 맞춰 주세요"; exit 1; }
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

@@ -5,8 +5,8 @@ body{margin:0}
 /* 레이아웃: 탁상 달력처럼 큰 월 숫자 + 종이 위 할 일 줄, 아래 탭 4개 */
 :root{
   --paper:#FBFAF6; --card:#FFFFFF; --ink:#1A2340; --muted:#6B7290; --line:#E3E1D8;
-  --cobalt:#1F3FA6; --lemon:#F3E37C; --grass:#2E8B57; --soft:#EEF1FB; --warn:#F5B400; --red:#D2453A;
-  --t0:#E03131; --t1:#F08C00; --t2:#F2C200; --t3:#2F9E44; --t4:#1C7ED6; --t5:#7048E8; --t6:#E64980; --t7:#868E96; --hol:#D2453A; --sat:#3B6FD8; --ann:#8B5CF6;
+  --cobalt:#1F3FA6; --lemon:#F3E37C; --grass:#2E8B57; --soft:#EEF1FB; --warn:#F5B400; --red:#C0392B;
+  --t0:#E03131; --t1:#F08C00; --t2:#F2C200; --t3:#2F9E44; --t4:#1C7ED6; --t5:#7048E8; --t6:#E64980; --t7:#868E96; --hol:#C0392B; --sat:#2F62C8; --ann:#8B5CF6;
   --display:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
   --body:system-ui,-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;
 }
@@ -442,3 +442,42 @@ body.painting{-webkit-user-select:none;user-select:none}
 .toast,.hint,.sec,button{word-break:keep-all;overflow-wrap:anywhere}
 .nz .ht-r>:first-child{position:sticky;left:0;background:var(--paper);z-index:1}
 .sheet{position:relative}.shx{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radius:50%;font-size:24px;line-height:1;color:var(--muted);background:transparent;z-index:2}.sheet>h3{padding-right:40px}
+
+/* v2.14: 달력 넘침 막기, 글자 줄바꿈, 누르기 쉬운 버튼(44px), 잘 보이는 시간표, 백업 파일 */
+body{word-break:keep-all;overflow-wrap:anywhere}
+.head .t span{word-break:keep-all}
+.cal div,.cal button{overflow:hidden}
+.rt-row{flex-wrap:nowrap;overflow:hidden;max-width:100%;min-width:0}
+.rt.more{font-size:9px;font-weight:800;color:var(--muted);align-self:center;white-space:nowrap;flex:none;overflow-wrap:normal}
+.sheet textarea:not(.code){display:block;width:100%;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:12px;padding:10px 12px;font:inherit;line-height:1.5;resize:vertical;margin:8px 0}
+.sheet input[type=password],.sheet input[type=search]{width:100%;border:1px solid var(--line);background:var(--paper);color:var(--ink);border-radius:10px;padding:10px;font:inherit;margin:8px 0}
+.sheet textarea.code{margin:8px 0}
+/* 시간표: + 버튼과 분 숫자 */
+.tl-add{color:var(--muted);font-weight:700}
+.tt-p .tl-add{display:flex;align-items:center;min-height:44px}
+.cell-l{font-size:11px;font-weight:600}
+/* 누르는 곳은 44px 이상 (보이는 크기는 작아도 됨) */
+.chip{position:relative;min-height:30px}
+.chip::after{content:"";position:absolute;left:-2px;right:-2px;top:50%;height:44px;transform:translateY(-50%)}
+.tags .chip,.brush .chip,.sheet .chips .chip,.weeks .chip{min-height:36px;padding-top:4px;padding-bottom:4px}
+.row .chips .chip{min-height:30px}
+.wklb{font-size:11px;color:var(--muted);align-self:center;margin-right:1px}
+.chip.wk{min-width:30px;justify-content:center}
+.nav button{width:36px;height:36px;position:relative}
+.nav button::after{content:"";position:absolute;inset:-4px}
+.nav{gap:4px}
+.mood{width:40px;height:40px;position:relative}
+.mood::after{content:"";position:absolute;inset:-2px}
+.ver{min-height:24px}
+.ver::after{content:"";position:absolute;left:-6px;right:-6px;top:50%;height:44px;transform:translateY(-50%)}
+.brbtn,.tmgo{position:relative}.brbtn::after,.tmgo::after{content:"";position:absolute;inset:-7px}
+.linkbtn{min-height:44px}
+.imgbtn{min-height:44px;padding:0 4px}
+.empty button{min-height:44px;padding:0 8px}
+.empty .btn{display:block;width:100%;max-width:280px;margin:10px auto 0;border:1px solid var(--line);border-radius:12px;padding:10px;font-weight:700;text-decoration:none;color:var(--ink)}
+.empty b{display:block;color:var(--ink);font-size:16px;margin-bottom:6px}
+/* 정보 창: 오른쪽 위 × , 업데이트 내용 점 목록 */
+.sheet .ai-st{color:var(--ink);font-size:14px}
+.note ul{margin:4px 0 0;padding-left:18px}
+.note li{margin:2px 0;line-height:1.5}
+.txt .tm,.pop-t .tm{margin-right:2px}

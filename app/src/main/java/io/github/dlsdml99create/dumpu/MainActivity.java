@@ -145,6 +145,60 @@ public class MainActivity extends Activity {
         }
     }
 
+    // ── 백업 파일 (저장·불러오기): 사용자가 고른 파일 하나만 읽고 써요
+    private static final int REQ_BK_SAVE = 7301, REQ_BK_OPEN = 7302;
+    private String bkData;
+
+    void js(String code) { runOnUiThread(() -> { if (web != null) web.evaluateJavascript(code, null); }); }
+
+    void startBackupSave(String name, String text) {
+        bkData = text;
+        try {
+            startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("application/json").putExtra(Intent.EXTRA_TITLE, name), REQ_BK_SAVE);
+        } catch (Exception e) { bkData = null; js("window.__bkDone&&window.__bkDone(false)"); }
+    }
+
+    void startBackupOpen() {
+        try {
+            startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("*/*").putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/json", "text/plain", "application/octet-stream"}), REQ_BK_OPEN);
+        } catch (Exception e) { js("window.__bkOpened&&window.__bkOpened(null)"); }
+    }
+
+    @Override
+    protected void onActivityResult(int req, int res, Intent data) {
+        super.onActivityResult(req, res, data);
+        if (req != REQ_BK_SAVE && req != REQ_BK_OPEN) return;
+        final Uri u = (res == RESULT_OK && data != null) ? data.getData() : null;
+        if (req == REQ_BK_SAVE) {
+            final String text = bkData; bkData = null;
+            if (u == null || text == null) { js("window.__bkDone&&window.__bkDone(false,'cancel')"); return; }
+            new Thread(() -> {
+                boolean ok;
+                try (java.io.OutputStream o = getContentResolver().openOutputStream(u, "wt")) {
+                    if (o == null) throw new java.io.IOException();
+                    o.write(text.getBytes(java.nio.charset.StandardCharsets.UTF_8)); ok = true;
+                } catch (Exception e) { ok = false; }
+                js("window.__bkDone&&window.__bkDone(" + ok + ")");
+            }).start();
+            return;
+        }
+        if (u == null) { js("window.__bkOpened&&window.__bkOpened(null,'cancel')"); return; }
+        new Thread(() -> {
+            String out = null;
+            try (java.io.InputStream in = getContentResolver().openInputStream(u)) {
+                if (in != null) {
+                    java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                    byte[] buf = new byte[65536]; int n, total = 0;
+                    while ((n = in.read(buf)) > 0) { total += n; if (total > 15_000_000) { bo = null; break; } bo.write(buf, 0, n); }
+                    if (bo != null) out = bo.toString("UTF-8");
+                }
+            } catch (Exception ignored) { }
+            js("window.__bkOpened&&window.__bkOpened(" + (out == null ? "null" : org.json.JSONObject.quote(out)) + ")");
+        }).start();
+    }
+
     @Override
     protected void onDestroy() {
         if (web != null) {
