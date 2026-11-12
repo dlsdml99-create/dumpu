@@ -231,8 +231,8 @@ function h(tag,a,...kids){const e=document.createElement(tag);
   if(a)for(const k in a){if(k==='on')for(const ev in a.on)e.addEventListener(ev,a.on[ev]);else if(k==='class')e.className=a[k];else if(k==='text')e.textContent=a[k];else if(a[k]!=null)e.setAttribute(k,a[k])}
   for(const c of kids.flat(Infinity)){if(c==null||c===false)continue;e.append(c.nodeType?c:document.createTextNode(c))}
   return e}
-let toastT;function toast(msg,undo){const old=document.querySelector('.toast');if(old)old.remove();
-  const t=h('div',{class:'toast'+(undo?' has-undo':'')},h('span',{text:msg}),undo?h('button',{type:'button',text:'되돌리기',on:{click:()=>{t.remove();undo()}}}):null);
+let toastT;function toast(msg,undo,label){const old=document.querySelector('.toast');if(old)old.remove();
+  const t=h('div',{class:'toast'+(undo?' has-undo':'')},h('span',{text:msg}),undo?h('button',{type:'button',text:label||'되돌리기',on:{click:()=>{t.remove();undo()}}}):null);
   document.body.append(t);clearTimeout(toastT);toastT=setTimeout(()=>t.remove(),undo?8000:2400)}
 // 할 일 하나를 되돌릴 수 있게 지금 상태 기억
 function snap(t){const o=JSON.parse(JSON.stringify(t));return ()=>{const D=data();const cur=D.tasks.find(x=>x.id===o.id);if(cur)Object.assign(cur,o);else D.tasks.push(o);save();rerender()}}
@@ -253,12 +253,34 @@ function splitTime(line){
   if(hh>23||mm>59)return {text:line,time:null,bad:true};
   return {text:m[5].trim(),time:pad(hh)+':'+pad(mm)};
 }
+// "내일 병원", "금요일 장보기", "25일 관리비", "11/20 치과", "다음 주 월요일 회의" → 날짜를 읽고 글에서 뺌
+const WDN={'월':0,'화':1,'수':2,'목':3,'금':4,'토':5,'일':6};
+function splitDate(line,extra){
+  const t0=todayS();let m,day=null,rest=line;
+  const addD=(s,n)=>{const x=parse(s);x.setDate(x.getDate()+n);return ymd(x)};
+  if((m=line.match(/^(오늘|내일|모레)\s+(.+)$/))){day=addD(t0,{오늘:0,내일:1,모레:2}[m[1]]);rest=m[2]}
+  else if((m=line.match(/^(다음\s*주|담주|이번\s*주)?\s*([월화수목금토일])(?:요일|욜)\s+(.+)$/))){
+    const w=WDN[m[2]];let base;
+    if(!m[1]&&extra&&Number.isInteger(extra.week)){const W=weeksOf(st.y,st.m)[extra.week];if(W)day=W[w]}
+    if(!day){const x=parse(t0);x.setDate(x.getDate()-dowOf(t0));base=ymd(x);
+      if(m[1]&&/다음|담/.test(m[1]))day=addD(base,7+w);else if(m[1])day=addD(base,w);else{day=addD(base,w);if(day<t0)day=addD(day,7)}}
+    rest=m[3]}
+  else if((m=line.match(/^(\d{1,2})\s*(?:\/|월\s*|\.)\s*(\d{1,2})\s*일?\s+(.+)$/))){const mo=+m[1],dd=+m[2];
+    if(mo>=1&&mo<=12){let y=+t0.slice(0,4);const s=y+'-'+pad(mo)+'-'+pad(dd);if(isDate(s)){day=s<addD(t0,-60)&&isDate((y+1)+'-'+pad(mo)+'-'+pad(dd))?(y+1)+'-'+pad(mo)+'-'+pad(dd):s;rest=m[3]}}}
+  else if((m=line.match(/^(\d{1,2})\s*일\s+(.+)$/))){const s=st.y+'-'+pad(st.m+1)+'-'+pad(+m[1]);if(isDate(s)){day=s;rest=m[2]}}
+  return day?{day,rest:rest.trim()}:null}
 function addTasks(text,extra){
   const lines=text.split('\n').map(s=>s.trim()).filter(Boolean).map(s=>s.slice(0,200));
   if(!lines.length){toast('할 일을 적어 주세요');return 0}
   let bad=0;
-  for(const l of lines){const p=splitTime(l);if(p.bad)bad++;
-    data().tasks.push(Object.assign({id:uid(),text:p.text,tag:st.addTag,rep:null,month:mKey(),week:null,day:null,time:p.time,done:false,doneAt:null},extra||{}))}
+  let dated=0;
+  for(let l of lines){let dd=splitDate(l,extra);if(dd)l=dd.rest;let p=splitTime(l);
+    if(!dd&&p.time){const d2=splitDate(p.text,extra);if(d2){dd=d2;p.text=d2.rest}} // "3시 금요일 치과"
+    if(p.bad)bad++;
+    const o=Object.assign({id:uid(),text:p.text,tag:st.addTag,rep:null,month:mKey(),week:null,day:null,time:p.time,done:false,doneAt:null},extra||{});
+    if(dd){o.day=dd.day;o.month=mkOf(dd.day);o.week=weekOfDay(dd.day);delete o.src;dated++}
+    data().tasks.push(o)}
+  if(dated)setTimeout(()=>toast(dated+'개는 적은 날짜에 넣었어요 (예: 내일·금요일·25일)'),bad?3200:1700);
   save();if(bad)setTimeout(()=>toast('25시처럼 없는 시간은 시간 없이 넣었어요. 길게 눌러 시간을 고칠 수 있어요'),1600);return lines.length;
 }
 function toggle(t){const u=snap(t);delete t.autoDone;t.done=!t.done;t.doneAt=t.done?todayS():null;save();rerender();toast(t.done?md(t.doneAt)+' 완료로 기록했어요':'완료를 취소했어요',u)}
@@ -437,6 +459,12 @@ function fmtDur(ms){const s=Math.floor(ms/1000),hh=Math.floor(s/3600),mm=Math.fl
 function slotOfTime(ms){const x=new Date(ms);let hh=x.getHours(),day=ymd(x);
   if(hh<3){const p=new Date(x);p.setDate(p.getDate()-1);day=ymd(p);hh+=24}
   return {day,slot:hh*6+Math.floor(x.getMinutes()/10)}}
+// 할 일 이름과 같은 습관이 있으면 오늘 칸을 저절로 체크 (예: 할 일 "영어 공부" → 습관 "영어 공부")
+const normN=x=>String(x||'').replace(/\s+/g,'').toLowerCase();
+function habitAuto(text){const k=normN(text);if(k.length<2)return null;const d=todayS();
+  const hb=activeHabits().find(x=>{const n=normN(x.name);return n.length>=2&&(n===k||k.includes(n)||n.includes(k))&&habitOn(x,d)&&!habitDone(x,d)});
+  if(!hb)return null;const D=data();D.hchk=D.hchk||{};D.hchk[d]=[...(D.hchk[d]||[]),hb.id];save();
+  return {hb,undo:()=>{const a=(data().hchk||{})[d]||[];data().hchk[d]=a.filter(x=>x!==hb.id);if(!data().hchk[d].length)delete data().hchk[d];save();render()}}}
 function stopTimer(done,quiet){
   const D=data(),T=D.timer;if(!T)return;delete D.timer;
   const t=D.tasks.find(x=>x.id===T.id);let end=Date.now();if(T.focus)end=Math.min(end,T.start+T.focus*60e3);const cut=end-T.start>TMAX;if(cut)end=T.start+TMAX;
@@ -448,16 +476,33 @@ function stopTimer(done,quiet){
   save();render();const mins0=Math.round((end-T.start)/60e3);if(quiet)return {n,mins:mins0,text:t?t.text:''};
   const mins=Math.round((end-T.start)/60e3);
   if(!t){toast('할 일이 지워져서 기록하지 않았어요');return}
+  const ha=(n||done)?habitAuto(t.text):null;if(ha){render();toast((n?'⏱ '+hm(mins)+' 했어요 · ':'')+'습관 "'+ha.hb.name+'"도 오늘 체크했어요',ha.undo,'체크 취소');return}
   toast(n?'⏱ '+hm(mins)+' 했어요 · 10분 칸 '+n+'개에 칠했어요'+(kept?' (이미 칠한 '+kept+'칸은 그대로)':'')+(cut?' · 12시간까지만 셌어요':''):mins<5?'5분보다 짧아서 기록하지 않았어요':'이미 칠한 칸이라 그대로 뒀어요');
 }
+// 🍅 끝: 같은 이름 습관 체크 + 5분 쉬기 / 한 번 더
+function focusDone(T,r){const t=data().tasks.find(x=>x.id===T.id),ha=t&&r&&r.n?habitAuto(t.text):null;render();
+  const close=sheet(h('h3',{text:'🍅 '+T.focus+'분 집중 끝!'}),
+    h('p',{text:(r&&r.n?'10분 칸 '+r.n+'개에 칠했어요.':'')+(ha?' 습관 "'+ha.hb.name+'"도 오늘 체크했어요.':'')+' 잠깐 쉬어 갈까요?'}),
+    h('button',{class:'btn pri',type:'button',text:'☕ 5분 쉬기 (끝나면 알려 드려요)',on:{click:()=>{st.brk={until:Date.now()+5*60e3,id:T.id};close();render();toast('☕ 5분 쉬어요')}}}),
+    t&&!t.done?h('button',{class:'btn',type:'button',text:'🍅 한 번 더 (25분)',on:{click:()=>{data().timer={id:T.id,start:Date.now(),focus:25};save();close();render();toast('🍅 25분 집중 다시 시작!')}}}):null,
+    t&&!t.done?h('button',{class:'btn',type:'button',text:'✓ 다 했어요',on:{click:()=>{t.done=true;t.doneAt=todayS();save();close();render();toast('"'+t.text.slice(0,14)+'" 완료로 기록했어요')}}}):null,
+    ha?h('button',{class:'btn',type:'button',text:'습관 체크 취소',on:{click:()=>{ha.undo();close();toast('습관 체크를 취소했어요')}}}):null,
+    h('button',{class:'btn',type:'button',text:'그만할래요',on:{click:()=>close()}}))}
 function tmText(T){if(!T.focus)return fmtDur(Date.now()-T.start);const left=T.start+T.focus*60e3-Date.now();return left>0?fmtDur(left+999)+' 남음':'끝!'}
-function timerBar(){const D=data(),T=D.timer;if(!T)return null;const t=D.tasks.find(x=>x.id===T.id);
+function timerBar(){const D=data(),T=D.timer;
+  if(!T&&st.brk)return h('div',{class:'tmbar brk',role:'status'},h('span',{class:'tmt'},'☕ 쉬는 중 ',h('span',{class:'tmc',text:fmtDur(Math.max(0,st.brk.until-Date.now())+999)+' 남음'})),h('button',{type:'button',text:'그만 쉬기',on:{click:()=>{st.brk=null;render()}}}));
+  if(!T)return null;const t=D.tasks.find(x=>x.id===T.id);
   if(!t){delete D.timer;save();return null}
   return h('div',{class:'tmbar'+(T.focus?' focus':''),role:'status'},h('span',{class:'tmt'},T.focus?'🍅 ':'⏱ ',h('b',{text:t.text.slice(0,14)}),' ',h('span',{class:'tmc',text:tmText(T)})),
     !T.focus?h('button',{type:'button',text:'🍅 25분',title:'25분 동안 집중하고 끝나면 알려줘요','aria-label':'25분 집중 모드로 바꾸기',on:{click:()=>{const id=T.id,r=stopTimer(false,true);data().timer={id,start:Date.now(),focus:25};save();render();toast((r&&r.n?'지금까지 '+hm(r.mins)+' 기록했어요 · ':'')+'🍅 25분 집중 시작! 끝나면 알려 드려요')}}}):null,
     h('button',{type:'button',text:'■ 그만',on:{click:()=>stopTimer(false)}}),h('button',{type:'button',class:'ok',text:'✓ 다 했어요',on:{click:()=>stopTimer(true)}}))}
-setInterval(()=>{const T=data().timer;if(!T)return;const e=document.querySelector('.tmbar .tmc');
-  if(T.focus&&Date.now()>=T.start+T.focus*60e3){const r=stopTimer(false,true);try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(_){}toast('🍅 '+T.focus+'분 집중 끝! '+(r&&r.n?'10분 칸 '+r.n+'개에 칠했어요. ':'')+'5분 쉬어요');return}
+setInterval(()=>{
+  if(st.brk){const left=st.brk.until-Date.now(),b=document.querySelector('.tmbar.brk .tmc');
+    if(left<=0){const id=st.brk.id;st.brk=null;try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(_){}render();
+      const tk=data().tasks.find(x=>x.id===id);toast('☕ 쉬는 시간 끝!',tk&&!tk.done?()=>{data().timer={id,start:Date.now(),focus:25};save();render();toast('🍅 25분 집중 시작!')}:null,'🍅 한 번 더');}
+    else if(b)b.textContent=fmtDur(left+999)+' 남음'}
+  const T=data().timer;if(!T)return;const e=document.querySelector('.tmbar .tmc');
+  if(T.focus&&Date.now()>=T.start+T.focus*60e3){const r=stopTimer(false,true);try{navigator.vibrate&&navigator.vibrate([200,100,200])}catch(_){}focusDone(T,r);return}
   if(e)e.textContent=tmText(T)},1000);
 // ── 기분 모아 보기 (습관 탭): 이번 달 기분, 기분 좋은 날 한 것, 1년 기분 한눈에
 const MSCORE={'😆':5,'😊':4,'🙂':4,'😐':3,'😴':3,'😔':2,'😢':1,'😠':1};
