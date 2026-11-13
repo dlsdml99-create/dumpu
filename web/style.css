@@ -481,3 +481,31 @@ body{word-break:keep-all;overflow-wrap:anywhere}
 .note ul{margin:4px 0 0;padding-left:18px}
 .note li{margin:2px 0;line-height:1.5}
 .txt .tm,.pop-t .tm{margin-right:2px}
+
+/* v2.15: 글자 대비 4.5:1 (밝은 색 습관·카테고리 이름은 조금 진하게), 습관 이름 한 줄 전체, 버전 표시는 아래 탭 왼쪽 칸 */
+:root{--k0:#D72F2F;--k1:#A76100;--k2:#896E00;--k3:#268137;--k4:#1973C4;--k5:#7048E8;--k6:#C53E6E;--k7:#6C7379;--ck0:#fff;--ck1:#0B0F1A;--ck2:#0B0F1A;--ck3:#0B0F1A;--ck4:#0B0F1A;--ck5:#fff;--ck6:#0B0F1A;--ck7:#0B0F1A}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--k0:var(--t0);--k1:var(--t1);--k2:var(--t2);--k3:var(--t3);--k4:var(--t4);--k5:var(--t5);--k6:var(--t6);--k7:var(--t7);--ck0:#12151F;--ck1:#12151F;--ck2:#12151F;--ck3:#12151F;--ck4:#12151F;--ck5:#12151F;--ck6:#12151F;--ck7:#12151F}}
+:root[data-theme="dark"]{--k0:var(--t0);--k1:var(--t1);--k2:var(--t2);--k3:var(--t3);--k4:var(--t4);--k5:var(--t5);--k6:var(--t6);--k7:var(--t7);--ck0:#12151F;--ck1:#12151F;--ck2:#12151F;--ck3:#12151F;--ck4:#12151F;--ck5:#12151F;--ck6:#12151F;--ck7:#12151F}
+.tc0{color:var(--k0)!important}.tc1{color:var(--k1)!important}.tc2{color:var(--k2)!important}.tc3{color:var(--k3)!important}.tc4{color:var(--k4)!important}.tc5{color:var(--k5)!important}.tc6{color:var(--k6)!important}.tc7{color:var(--k7)!important}
+.ht-c.on.c0{color:var(--ck0)}.ht-c.on.c1{color:var(--ck1)}.ht-c.on.c2{color:var(--ck2)}.ht-c.on.c3{color:var(--ck3)}.ht-c.on.c4{color:var(--ck4)}.ht-c.on.c5{color:var(--ck5)}.ht-c.on.c6{color:var(--ck6)}.ht-c.on.c7{color:var(--ck7)}
+.ht-c.on.cn{color:#fff}
+/* 습관 표: 이름은 줄 전체를 써서 잘리지 않게, 아래 줄에 날짜 칸 */
+.ht-r,.ht.all .ht-r,.nz .ht-r{grid-template-columns:repeat(var(--n),minmax(0,1fr)) 34px;row-gap:2px}
+.nz .ht-r{grid-template-columns:repeat(var(--n),minmax(22px,1fr)) 30px}
+.ht.all .ht-r,.nz .ht.all .ht-r{grid-template-columns:repeat(var(--n),minmax(0,1fr)) 30px}
+.ht-r>.ht-n{grid-column:1/-1;display:flex;align-items:center;gap:4px;min-width:0}
+.ht-head>.ht-n{display:none}
+.ht-nb,.nz .ht-nb{display:block;-webkit-line-clamp:unset;white-space:normal;word-break:keep-all;overflow-wrap:anywhere;font-size:13px;line-height:1.3;overflow:visible;text-overflow:clip;padding:2px 0}
+.nz .ht-r>:first-child{position:static}
+/* 예시 닫기 버튼: 누르기 쉽게 44px */
+.demo .demo-x{min-height:44px;padding:0 10px;margin:-8px -6px -8px 0}
+/* 달력 칸 습관: 2개까지, 3개부터 1개 + "+N" */
+.rt.more{font-size:10px;letter-spacing:-.3px}
+/* 버전 표시: 아래 탭 줄 왼쪽 칸 (글자를 키워도 안내 글을 가리지 않게) */
+.bar{align-items:stretch}
+.bar .in{flex:1 1 auto;min-width:0}
+.ver,.ver.new{position:static;flex:none;align-self:stretch;width:46px;min-height:44px;height:auto;border:none;border-right:1px solid var(--line);border-radius:0;background:var(--card);padding:0;display:flex;align-items:center;justify-content:center;font-size:11px}
+.ver::after{content:none}
+.ver.new{color:#1A2340;background:var(--warn);font-weight:800}
+/* 정보 창 업데이트 내용 글씨 크게 */
+.note{font-size:15px}.note b{font-size:13px}

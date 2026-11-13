@@ -24,7 +24,7 @@
     if (!I.online) return '미리보기에서는 새 버전을 확인하지 않아요';
     if (checking) return '새 버전을 확인하는 중이에요…';
     if (hasNew()) return '새 버전(v' + latest + ')이 나왔어요';
-    if (failed && !latest) return '새 버전을 확인하지 못했어요. 인터넷 연결 후 다시 눌러 주세요.';
+    if (failed && !latest) return '새 버전을 확인하지 못했어요. 인터넷 연결을 확인해 주세요.';
     if (!latest) return '새 버전 확인을 눌러 주세요.';
     return '지금 쓰는 버전이 최신이에요.';
   }
@@ -95,10 +95,13 @@
     sheetBox.append(ck);
     if (I.backup) {
       sheetBox.append(mk('div', 'sec', '내 데이터 백업'));
+      if (I.backup.block) { I.backup.block(function () { close(); }).forEach(function (n) { if (n) sheetBox.append(n); }); }
+      else {
       var bk = mk('div', 'two');
       var b1 = mk('button', 'btn', '백업 파일로 저장'); b1.type = 'button'; b1.style.margin = '0'; b1.onclick = function () { close(); I.backup.save(); };
       var b2 = mk('button', 'btn', '백업 불러오기'); b2.type = 'button'; b2.style.margin = '0'; b2.onclick = function () { close(); I.backup.open(); };
       bk.append(b1, b2); sheetBox.append(bk);
+      }
     }
     sheetBox.append(mk('div', 'sec', '업데이트 내용'));
     I.notes.forEach(function (n) {
